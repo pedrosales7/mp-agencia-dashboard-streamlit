@@ -4,7 +4,6 @@ Lê o snapshot semanal em data/latest.json -- nenhuma query ao vivo acontece
 aqui. O refresh (Metabase -> JSON) roda separado, no GitHub Actions.
 """
 
-import plotly.graph_objects as go
 import streamlit as st
 
 import data
@@ -78,24 +77,29 @@ def _delta(curr, prev_v, invert=False):
     return f"{pct:+.1f}%", ("inverse" if invert else "normal")
 
 
-k1, k2, k3, k4, k5, k6 = st.columns(6)
+k1, k2, k3, k4, k5, k6, k7 = st.columns(7)
 d, c = _delta(totals["liquido"], prev["liquido"])
 k1.metric("Investimento líquido", data.fmt_brl(totals["liquido"]), d, delta_color="off",
           help="Bruto − Cashback. Fonte: performance_partner_mp_agency.")
+d, c = _delta(totals["cashback"], prev["cashback"])
+k2.metric("Cashback", data.fmt_brl(totals["cashback"]), d, delta_color="off",
+          help="Parte do investimento bruto que não fica com o anunciante (lead/redirect caiu "
+               "fora da cobertura dele e voltou pra Melhor Plano). Líquido = Bruto − Cashback.")
+k2.caption(f"{totals['cashback'] / totals['bruto'] * 100:.0f}% do bruto" if totals["bruto"] else " ")
 d, c = _delta(totals["leads"], prev["leads"])
-k2.metric("Leads produtivos", data.fmt_num(totals["leads"]), d, delta_color=c,
+k3.metric("Leads produtivos", data.fmt_num(totals["leads"]), d, delta_color=c,
           help="source em google/whatsapp e lead_accepted=true.")
 d, c = _delta(totals["vendas"], prev["vendas"])
-k3.metric("Vendas", data.fmt_num(totals["vendas"]), d, delta_color=c,
+k4.metric("Vendas", data.fmt_num(totals["vendas"]), d, delta_color=c,
           help="current_situation IN (sold, installed, scheduled).")
 d, c = _delta(totals["cpl"], prev["cpl"], invert=True)
-k4.metric("CPL líq.", data.fmt_brl(totals["cpl"], 2), d, delta_color=c,
+k5.metric("CPL líq.", data.fmt_brl(totals["cpl"], 2), d, delta_color=c,
           help="Investimento líquido / Leads produtivos.")
 d, c = _delta(totals["cac"], prev["cac"], invert=True)
-k5.metric("CAC líq.", data.fmt_brl(totals["cac"], 2), d, delta_color=c,
+k6.metric("CAC líq.", data.fmt_brl(totals["cac"], 2), d, delta_color=c,
           help="Investimento líquido / Vendas.")
 d, c = _delta(totals["rate"], prev["rate"])
-k6.metric("Lead → Venda", data.fmt_pct(totals["rate"]), d, delta_color=c,
+k7.metric("Lead → Venda", data.fmt_pct(totals["rate"]), d, delta_color=c,
           help="Vendas / Leads produtivos.")
 
 st.divider()
@@ -139,8 +143,9 @@ st.divider()
 st.markdown('<h2 style="font-size:18px;">Análise de Cobertura e Assertividade</h2>', unsafe_allow_html=True)
 cov_df = data.build_coverage_df(d_ini, d_fim, canal_filter)
 st.markdown(tables.render_coverage_table(cov_df), unsafe_allow_html=True)
-st.caption("% Cashback: alto = lead caiu fora da cobertura do anunciante. "
-           "% Assertividade = leads produtivos / Vol. base (Clickoff no Google, Chat start no Meta).")
+st.caption("Uma linha por partner, Google e Meta lado a lado (cada canal tem sua própria base — "
+           "Clickoff pro Google, Chat start pro Meta). % Cashback: alto = lead caiu fora da cobertura "
+           "do anunciante. % Assertividade = Leads c/ cobertura / Leads totais.")
 
 st.divider()
 
@@ -185,46 +190,3 @@ else:
         st.write("")
 st.caption("Cor do delta: verde = taxa subiu, vermelho = caiu. "
            "\"—\" quando o denominador é menor que 5.")
-
-st.divider()
-
-# ------------------------------------------------------------------
-# Detalhamento consolidado
-# ------------------------------------------------------------------
-st.markdown('<h2 style="font-size:18px;">Detalhamento investimento × leads × vendas</h2>', unsafe_allow_html=True)
-detail_df = data.build_detail_df(d_ini, d_fim, canal_filter)
-st.markdown(tables.render_detail_table(detail_df), unsafe_allow_html=True)
-st.markdown(
-    '<div class="legend-row"><span class="sw"><i style="background:var(--crit)"></i></span> pior que a mediana · '
-    '<span class="sw"><i style="background:var(--good)"></i></span> melhor · '
-    'linha com rail âmbar: bruto &gt; 0 e leads = 0.</div>',
-    unsafe_allow_html=True,
-)
-
-st.divider()
-
-# ------------------------------------------------------------------
-# Crédito remanescente por parceiro
-# ------------------------------------------------------------------
-st.markdown('<h2 style="font-size:18px;">Crédito Remanescente por Parceiro</h2>', unsafe_allow_html=True)
-credit_df = data.build_credit_df(selected_partners or None)
-
-fig = go.Figure()
-for id_mp in (selected_partners or data.PARTNERS):
-    sub = credit_df[credit_df["id_mp"] == id_mp]
-    fig.add_trace(go.Scatter(
-        x=sub["semana"], y=sub["credito"], mode="lines+markers", name=id_mp,
-        line=dict(color=data.PARTNER_COLORS[id_mp], width=2),
-        marker=dict(size=5),
-        hovertemplate="%{fullData.name} · sem. %{x}: R$ %{y:,.0f}<extra></extra>",
-    ))
-fig.update_layout(
-    height=380, margin=dict(l=10, r=10, t=10, b=10),
-    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    xaxis=dict(title="Semana", showgrid=False),
-    yaxis=dict(title="Crédito remanescente (R$)", showgrid=True, gridcolor="rgba(128,128,128,0.15)"),
-)
-st.plotly_chart(fig, use_container_width=True)
-st.caption("Cada ponto = média do saldo diário na semana. "
-           "Clique num item da legenda pra ocultar/exibir a linha (nativo do Plotly).")

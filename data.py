@@ -50,7 +50,7 @@ CUTOFF_DATE = date.fromisoformat(CUTOFF)
 # Helpers (equivalentes ao dashboard HTML atual)
 # ------------------------------------------------------------------
 def fmt_brl(v, casas=0):
-    if v is None:
+    if v is None or not math.isfinite(v):
         return "—"
     return "R$ " + f"{v:,.{casas}f}".replace(",", "§").replace(".", ",").replace("§", ".")
 
@@ -205,86 +205,79 @@ def compute_totals(d_ini, d_fim, canal_filter):
     leads, vendas = combined["leads"].sum(), combined["vendas"].sum()
     liquido = bruto - cashback
     return {
-        "liquido": liquido, "leads": leads, "vendas": vendas,
+        "bruto": bruto, "cashback": cashback, "liquido": liquido, "leads": leads, "vendas": vendas,
         "cpl": safe_div(liquido, leads), "cac": safe_div(liquido, vendas),
         "rate": safe_div(vendas, leads),
     }
 
 
 # ------------------------------------------------------------------
-# Cobertura e Assertividade
+# Cobertura e Assertividade -- 1 linha por partner, Google/Meta lado a lado
+# (cada canal tem sua própria base -- Clickoff pro Google, Chat start pro
+# Meta -- então não faz sentido somar; layout replicado do dashboard atual).
 # ------------------------------------------------------------------
+def _coverage_channel_metrics(partner, inv, funnel, vol_col):
+    bruto = inv["bruto"].get(partner, 0)
+    cashback = inv["cashback"].get(partner, 0)
+    total_leads = funnel[vol_col].get(partner, 0) if partner in funnel.index else 0
+    covered_leads = funnel["leads"].get(partner, 0) if partner in funnel.index else 0
+    return {
+        "bruto": bruto, "cashback": cashback, "pct_cashback": safe_div(cashback, bruto),
+        "total_leads": total_leads, "covered_leads": covered_leads,
+        "pct_assert": safe_div(covered_leads, total_leads),
+    }
+
+
 def build_coverage_df(d_ini, d_fim, canal_filter):
-    g = _daily_google[_window_mask(_daily_google, d_ini, d_fim)].groupby("id_mp")[["clickoff", "leads"]].sum()
-    m = _daily_meta[_window_mask(_daily_meta, d_ini, d_fim)].groupby("id_mp")[["chat_start", "leads"]].sum()
+    g_funnel = _daily_google[_window_mask(_daily_google, d_ini, d_fim)].groupby("id_mp")[["clickoff", "leads"]].sum()
+    m_funnel = _daily_meta[_window_mask(_daily_meta, d_ini, d_fim)].groupby("id_mp")[["chat_start", "leads"]].sum()
     snap = _daily_snapshot[_window_mask(_daily_snapshot, d_ini, d_fim)]
+    g_inv = snap[snap["canal"] == "google"].groupby("id_mp")[["bruto", "cashback"]].sum()
+    m_inv = snap[snap["canal"] == "meta"].groupby("id_mp")[["bruto", "cashback"]].sum()
 
     rows = []
-    for canal, funnel, vol_col, base_label in (("google", g, "clickoff", "Clickoff"), ("meta", m, "chat_start", "Chat start")):
-        if canal_filter and canal_filter != canal:
-            continue
-        inv = snap[snap["canal"] == canal].groupby("id_mp")[["bruto", "cashback"]].sum()
-        for p in PARTNERS:
-            bruto = inv["bruto"].get(p, 0)
-            cashback = inv["cashback"].get(p, 0)
-            vol_base = funnel[vol_col].get(p, 0) if p in funnel.index else 0
-            leads = funnel["leads"].get(p, 0) if p in funnel.index else 0
-            rows.append({"id_mp": p, "canal": canal, "bruto": bruto, "cashback": cashback,
-                          "vol_base": vol_base, "leads": leads, "base_label": base_label})
+    for p in PARTNERS:
+        row = {"id_mp": p}
+        for prefix, metrics in (("g", _coverage_channel_metrics(p, g_inv, g_funnel, "clickoff")),
+                                 ("m", _coverage_channel_metrics(p, m_inv, m_funnel, "chat_start"))):
+            for k, v in metrics.items():
+                row[f"{prefix}_{k}"] = v
+        rows.append(row)
     df = pd.DataFrame(rows)
-    df["pct_cashback"] = df.apply(lambda r: safe_div(r["cashback"], r["bruto"]), axis=1)
-    df["pct_assert"] = df.apply(lambda r: safe_div(r["leads"], r["vol_base"]), axis=1)
 
-    meds = {}
-    for canal in ("google", "meta"):
-        sub = df[(df["canal"] == canal) & (df["bruto"] >= 100)]
-        meds[(canal, "cash")] = median(sub["pct_cashback"].tolist())
-        sub2 = sub[sub["vol_base"] >= 20]
-        meds[(canal, "asr")] = median(sub2["pct_assert"].tolist())
+    def channel_medians(bruto_col, cash_col, leads_col, assert_col):
+        elig = df[df[bruto_col] >= 100]
+        med_cash = median(elig[cash_col].tolist())
+        elig2 = elig[elig[leads_col] >= 20]
+        med_asr = median(elig2[assert_col].tolist())
+        return med_cash, med_asr
 
-    def row_status(row):
-        elig_cash = row["bruto"] >= 100
-        elig_asr = row["bruto"] >= 100 and row["vol_base"] >= 20
-        cls_cash = outlier_status(row["pct_cashback"], meds[(row["canal"], "cash")], "cost") if elig_cash else None
-        cls_asr = outlier_status(row["pct_assert"], meds[(row["canal"], "asr")], "rate") if elig_asr else None
-        return pd.Series({"status_cash": cls_cash, "status_asr": cls_asr, "elig_asr": elig_asr})
+    med_cash_g, med_asr_g = channel_medians("g_bruto", "g_pct_cashback", "g_total_leads", "g_pct_assert")
+    med_cash_m, med_asr_m = channel_medians("m_bruto", "m_pct_cashback", "m_total_leads", "m_pct_assert")
 
-    df = df.join(df.apply(row_status, axis=1))
-    return df.sort_values("bruto", ascending=False)
-
-
-# ------------------------------------------------------------------
-# Detalhamento consolidado
-# ------------------------------------------------------------------
-def build_detail_df(d_ini, d_fim, canal_filter):
-    snap = _daily_snapshot[_window_mask(_daily_snapshot, d_ini, d_fim)]
-    if canal_filter:
-        snap = snap[snap["canal"] == canal_filter]
-    agg = snap.groupby("id_mp")[["bruto", "cashback", "leads", "vendas"]].sum()
-    agg = agg.reindex(PARTNERS, fill_value=0).reset_index().rename(columns={"index": "id_mp"})
-
-    df = agg.copy()
-    df["liquido"] = df["bruto"] - df["cashback"]
-    df["cpl"] = df.apply(lambda r: safe_div(r["liquido"], r["leads"]), axis=1)
-    df["cac"] = df.apply(lambda r: safe_div(r["liquido"], r["vendas"]), axis=1)
-    df["rate"] = df.apply(lambda r: safe_div(r["vendas"], r["leads"]), axis=1)
-    df["warn"] = (df["bruto"] > 0) & (df["leads"] == 0)
-
-    peers = df[df["leads"] >= 3]
-    med_rate = median(peers["rate"].tolist())
-    med_cac = median(peers[peers["vendas"] > 0]["cac"].tolist())
-    med_cpl = median(peers["cpl"].tolist())
-
-    def status(row):
-        elig = row["leads"] >= 3
+    def status_row(row):
+        elig_cash_g, elig_asr_g = row["g_bruto"] >= 100, row["g_bruto"] >= 100 and row["g_total_leads"] >= 20
+        elig_cash_m, elig_asr_m = row["m_bruto"] >= 100, row["m_bruto"] >= 100 and row["m_total_leads"] >= 20
         return pd.Series({
-            "status_rate": outlier_status(row["rate"], med_rate, "rate") if elig else None,
-            "status_cac": outlier_status(row["cac"], med_cac, "cost") if elig else None,
-            "status_cpl": outlier_status(row["cpl"], med_cpl, "cost") if elig else None,
+            "g_status_cash": outlier_status(row["g_pct_cashback"], med_cash_g, "cost") if elig_cash_g else None,
+            "g_status_asr": outlier_status(row["g_pct_assert"], med_asr_g, "rate") if elig_asr_g else None,
+            "g_elig_asr": elig_asr_g,
+            "m_status_cash": outlier_status(row["m_pct_cashback"], med_cash_m, "cost") if elig_cash_m else None,
+            "m_status_asr": outlier_status(row["m_pct_assert"], med_asr_m, "rate") if elig_asr_m else None,
+            "m_elig_asr": elig_asr_m,
         })
 
-    df = df.join(df.apply(status, axis=1))
-    return df.sort_values("liquido", ascending=False)
+    df = df.join(df.apply(status_row, axis=1))
+
+    if canal_filter == "google":
+        for c in [c for c in df.columns if c.startswith("m_")]:
+            df[c] = None
+    elif canal_filter == "meta":
+        for c in [c for c in df.columns if c.startswith("g_")]:
+            df[c] = None
+
+    df["_sort"] = df["g_bruto"].fillna(0) + df["m_bruto"].fillna(0)
+    return df.sort_values("_sort", ascending=False).drop(columns="_sort")
 
 
 # ------------------------------------------------------------------
@@ -402,16 +395,3 @@ def build_taxas_df(id_mp, granularity):
             "leads_m": m["leads"].sum(), "vendas_m": m["vendas"].sum(),
         })
     return pd.DataFrame(rows)
-
-
-# ------------------------------------------------------------------
-# Crédito remanescente por parceiro
-# ------------------------------------------------------------------
-def build_credit_df(partner_filter=None):
-    records = []
-    for id_mp in PARTNERS:
-        if partner_filter and id_mp not in partner_filter:
-            continue
-        for i, r in enumerate(CREDIT_TIMESERIES.get(id_mp, []), start=1):
-            records.append({"id_mp": id_mp, "semana": i, "data": r["semana"], "credito": r["credito"]})
-    return pd.DataFrame(records)

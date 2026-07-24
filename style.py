@@ -34,6 +34,9 @@ table.dk-table .partner-cell { font-weight:600; }
 table.dk-table .cell-conv { display:block; font-size:10px; color:var(--mut2); margin-top:1px; font-weight:500; }
 table.dk-table tr.tr-total td { background:var(--bd-soft); font-weight:700; }
 table.dk-table tr.tr-warn td:first-child { border-left:3px solid var(--warn); }
+table.dk-table th.canal-group.google { color:var(--google); border-bottom:2px solid var(--google); text-align:center; }
+table.dk-table th.canal-group.meta { color:var(--meta); border-bottom:2px solid var(--meta); text-align:center; }
+table.dk-table td.taxas-raw { color:var(--mut2); font-style:italic; cursor:help; }
 
 .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px; vertical-align:1px; }
 .status-dot.good { background: var(--good); } .status-dot.bad { background: var(--crit); }

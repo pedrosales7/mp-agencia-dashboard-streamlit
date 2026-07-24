@@ -3,7 +3,7 @@ taxas) -- Streamlit não tem widget nativo pra célula com ponto de status ou
 sparkline inline, então isso é HTML puro, renderizado via st.markdown.
 """
 
-from data import fmt_brl, fmt_num, fmt_pct, safe_div, outlier_status, funnel_medians, taxa_value
+from data import fmt_brl, fmt_num, fmt_pct, safe_div, outlier_status, funnel_medians, taxa_value, TAXAS_MIN_DENOM
 from style import status_dot, sparkline_svg
 
 
@@ -57,51 +57,31 @@ def render_funnel_table(df, step_keys, step_labels, min_cliques):
 
 
 def render_coverage_table(df):
+    """1 linha por partner, Google e Meta como grupos de coluna lado a lado
+    (cabeçalho de 2 níveis) -- cada canal tem sua própria base (Clickoff pro
+    Google, Chat start pro Meta), então não faz sentido somar os dois."""
     html = ['<table class="dk-table"><thead><tr>',
-            "<th>Partner</th><th>Canal</th><th>Bruto</th><th>Cashback</th>",
-            "<th>% Cashback</th><th>Vol. base</th><th>Leads</th><th>% Assertividade</th>",
+            '<th rowspan="2" style="vertical-align:bottom;">Partner</th>',
+            '<th colspan="4" class="canal-group google">Google</th>',
+            '<th colspan="4" class="canal-group meta">Meta</th>',
+            "</tr><tr>",
+            "<th>% Cashback</th><th>Leads totais</th><th>Leads c/ cobertura</th><th>% Assertividade</th>",
+            "<th>% Cashback</th><th>Leads totais</th><th>Leads c/ cobertura</th><th>% Assertividade</th>",
             "</tr></thead><tbody>"]
-    for _, r in df.iterrows():
-        asr_html = fmt_pct(r["pct_assert"]) if r["elig_asr"] else "—"
-        html.append(
-            f'<tr><td class="partner-cell">{r["id_mp"]}</td>'
-            f'<td><span class="canal-tag {r["canal"]}">{r["canal"]}</span></td>'
-            f'<td>{fmt_brl(r["bruto"])}</td><td>{fmt_brl(r["cashback"])}</td>'
-            f'<td>{status_dot(r["status_cash"])}{fmt_pct(r["pct_cashback"])}</td>'
-            f'<td>{fmt_num(r["vol_base"])}<span class="cell-conv">{r["base_label"]}</span></td>'
-            f'<td>{fmt_num(r["leads"])}</td>'
-            f'<td>{status_dot(r["status_asr"])}{asr_html}</td></tr>'
-        )
-    html.append("</tbody></table>")
-    return "".join(html)
 
-
-def render_detail_table(df):
-    html = ['<table class="dk-table"><thead><tr>',
-            "<th>Partner</th><th>Bruto</th><th>Cashback</th><th>Líquido</th>",
-            "<th>Leads</th><th>Vendas</th><th>CPL líq.</th><th>CAC líq.</th><th>Lead→Venda</th>",
-            "</tr></thead><tbody>"]
-    totals = {"bruto": 0, "cashback": 0, "liquido": 0, "leads": 0, "vendas": 0}
-    for _, r in df.iterrows():
-        row_cls = "tr-warn" if r["warn"] else ""
-        html.append(
-            f'<tr class="{row_cls}"><td class="partner-cell">{r["id_mp"]}</td>'
-            f'<td>{fmt_brl(r["bruto"])}</td><td>{fmt_brl(r["cashback"])}</td><td>{fmt_brl(r["liquido"])}</td>'
-            f'<td>{fmt_num(r["leads"])}</td><td>{fmt_num(r["vendas"])}</td>'
-            f'<td>{status_dot(r["status_cpl"])}{fmt_brl(r["cpl"])}</td>'
-            f'<td>{status_dot(r["status_cac"])}{fmt_brl(r["cac"])}</td>'
-            f'<td>{status_dot(r["status_rate"])}{fmt_pct(r["rate"])}</td></tr>'
+    def channel_cells(r, prefix):
+        if r[f"{prefix}_bruto"] is None:
+            return "<td>—</td><td>—</td><td>—</td><td>—</td>"
+        asr_html = fmt_pct(r[f"{prefix}_pct_assert"]) if r[f"{prefix}_elig_asr"] else "—"
+        return (
+            f'<td>{status_dot(r[f"{prefix}_status_cash"])}{fmt_pct(r[f"{prefix}_pct_cashback"])}</td>'
+            f'<td>{fmt_num(r[f"{prefix}_total_leads"])}</td>'
+            f'<td>{fmt_num(r[f"{prefix}_covered_leads"])}</td>'
+            f'<td>{status_dot(r[f"{prefix}_status_asr"])}{asr_html}</td>'
         )
-        for k in totals:
-            totals[k] += r[k]
-    html.append(
-        f'<tr class="tr-total"><td class="partner-cell">TOTAL</td>'
-        f'<td>{fmt_brl(totals["bruto"])}</td><td>{fmt_brl(totals["cashback"])}</td><td>{fmt_brl(totals["liquido"])}</td>'
-        f'<td>{fmt_num(totals["leads"])}</td><td>{fmt_num(totals["vendas"])}</td>'
-        f'<td>{fmt_brl(safe_div(totals["liquido"], totals["leads"]))}</td>'
-        f'<td>{fmt_brl(safe_div(totals["liquido"], totals["vendas"]))}</td>'
-        f'<td>{fmt_pct(safe_div(totals["vendas"], totals["leads"]))}</td></tr>'
-    )
+
+    for _, r in df.iterrows():
+        html.append(f'<tr><td class="partner-cell">{r["id_mp"]}</td>{channel_cells(r, "g")}{channel_cells(r, "m")}</tr>')
     html.append("</tbody></table>")
     return "".join(html)
 
@@ -153,10 +133,17 @@ def render_taxas_block(df, stages, gran_label):
         html.append(f'<th>{r["label"]}</th>')
     html.append(f'<th>Trajetória</th><th>Δ {gran_label}</th></tr></thead><tbody>')
     for from_label, to_label, num_key, den_key in stages:
-        vals = [taxa_value(r[num_key], r[den_key]) for _, r in df.iterrows()]
+        rows = list(df.iterrows())
+        vals = [taxa_value(r[num_key], r[den_key]) for _, r in rows]
         html.append(f'<tr><td class="taxas-stage">{from_label} <span class="sub">→ {to_label}</span></td>')
-        for v in vals:
-            html.append(f'<td>{"—" if v is None else f"{v*100:.1f}%"}</td>')
+        for v, (_, r) in zip(vals, rows):
+            if v is not None:
+                html.append(f'<td>{v*100:.1f}%</td>')
+            elif r[den_key]:
+                html.append(f'<td class="taxas-raw" title="Base pequena (menos de {TAXAS_MIN_DENOM}) '
+                            f'— taxa não exibida pra não induzir a erro">{r[num_key]}/{r[den_key]}</td>')
+            else:
+                html.append('<td>—</td>')
         html.append(f'<td class="taxas-spark">{sparkline_svg(vals)}</td>')
         html.append(f'<td>{_taxas_delta(vals[-1], vals[-2] if len(vals) > 1 else None)}</td></tr>')
     html.append("</tbody></table>")
