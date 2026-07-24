@@ -91,29 +91,43 @@ def _delta(curr, prev_v, invert=False):
 
 
 k1, k2, k3, k4, k5, k6, k7 = st.columns(7)
-d, c = _delta(totals["liquido"], prev["liquido"])
-k1.metric("Investimento líquido", data.fmt_brl(totals["liquido"]), d, delta_color="off",
-          help="Bruto − Cashback. Fonte: performance_partner_mp_agency.")
-d, c = _delta(totals["cashback"], prev["cashback"])
-k2.metric("Cashback", data.fmt_brl(totals["cashback"]), d, delta_color="off",
-          help="Parte do investimento bruto que não fica com o anunciante (lead/redirect caiu "
-               "fora da cobertura dele e voltou pra Melhor Plano). Líquido = Bruto − Cashback.")
-k2.caption(f"{totals['cashback'] / totals['bruto'] * 100:.0f}% do bruto" if totals["bruto"] else " ")
-d, c = _delta(totals["leads"], prev["leads"])
-k3.metric("Leads produtivos", data.fmt_num(totals["leads"]), d, delta_color=c,
-          help="source em google/whatsapp e lead_accepted=true.")
-d, c = _delta(totals["vendas"], prev["vendas"])
-k4.metric("Vendas", data.fmt_num(totals["vendas"]), d, delta_color=c,
-          help="current_situation IN (sold, installed, scheduled).")
-d, c = _delta(totals["cpl"], prev["cpl"], invert=True)
-k5.metric("CPL líq.", data.fmt_brl(totals["cpl"], 2), d, delta_color=c,
-          help="Investimento líquido / Leads produtivos.")
-d, c = _delta(totals["cac"], prev["cac"], invert=True)
-k6.metric("CAC líq.", data.fmt_brl(totals["cac"], 2), d, delta_color=c,
-          help="Investimento líquido / Vendas.")
-d, c = _delta(totals["rate"], prev["rate"])
-k7.metric("Lead → Venda", data.fmt_pct(totals["rate"]), d, delta_color=c,
-          help="Vendas / Leads produtivos.")
+
+with k1.container(border=True):
+    d, c = _delta(totals["liquido"], prev["liquido"])
+    st.metric("Investimento líquido", data.fmt_brl(totals["liquido"]), d, delta_color="off",
+              help="Bruto − Cashback. Fonte: performance_partner_mp_agency.")
+
+with k2.container(border=True):
+    d, c = _delta(totals["cashback"], prev["cashback"])
+    st.metric("Cashback", data.fmt_brl(totals["cashback"]), d, delta_color="off",
+              help="Parte do investimento bruto que não fica com o anunciante (lead/redirect caiu "
+                   "fora da cobertura dele e voltou pra Melhor Plano). Líquido = Bruto − Cashback.")
+    st.caption(f"{totals['cashback'] / totals['bruto'] * 100:.0f}% do bruto" if totals["bruto"] else " ")
+
+with k3.container(border=True):
+    d, c = _delta(totals["leads"], prev["leads"])
+    st.metric("Leads produtivos", data.fmt_num(totals["leads"]), d, delta_color=c,
+              help="source em google/whatsapp e lead_accepted=true.")
+
+with k4.container(border=True):
+    d, c = _delta(totals["vendas"], prev["vendas"])
+    st.metric("Vendas", data.fmt_num(totals["vendas"]), d, delta_color=c,
+              help="current_situation IN (sold, installed, scheduled).")
+
+with k5.container(border=True):
+    d, c = _delta(totals["cpl"], prev["cpl"], invert=True)
+    st.metric("CPL líq.", data.fmt_brl(totals["cpl"], 2), d, delta_color=c,
+              help="Investimento líquido / Leads produtivos.")
+
+with k6.container(border=True):
+    d, c = _delta(totals["cac"], prev["cac"], invert=True)
+    st.metric("CAC líq.", data.fmt_brl(totals["cac"], 2), d, delta_color=c,
+              help="Investimento líquido / Vendas.")
+
+with k7.container(border=True):
+    d, c = _delta(totals["rate"], prev["rate"])
+    st.metric("Lead → Venda", data.fmt_pct(totals["rate"]), d, delta_color=c,
+              help="Vendas / Leads produtivos.")
 
 st.divider()
 

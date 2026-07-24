@@ -56,15 +56,9 @@ table.dk-table td.taxas-raw { color:var(--mut2); font-style:italic; cursor:help;
 .taxas-stage .sub { color:var(--mut2); font-weight:400; }
 .taxas-spark svg { display:block; margin-left:auto; color:var(--ink); }
 
-div[data-testid="stMetric"] {
-  background: var(--cd); border: 1px solid var(--bd); border-radius: 10px; padding: 10px 14px 8px;
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] > div[data-testid="stMetric"]) {
+  background: var(--cd); border-color: var(--bd) !important; border-radius: 10px; padding: 10px 14px 8px;
 }
-</style>
-"""
-
-KPI_RAIL_CSS = """
-<style>
-div[data-testid="stMetric"]:has(> [data-rail="{rail}"]) {{ border-left: 3px solid var(--{color}); }}
 </style>
 """
 
