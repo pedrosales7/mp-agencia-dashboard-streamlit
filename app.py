@@ -28,18 +28,19 @@ st.markdown(
 st.caption(
     "Atribuição pelo anunciante. Investimento via `performance_partner_mp_agency`; "
     "eventos via `comparison.*` + `whatsapp_assistant.*`; leads/vendas via `checkout.lead_detail`. "
-    "CPL/CAC sobre líquido. *Protótipo — dados ilustrativos, sem conexão com Metabase/Redshift.*"
+    "CPL/CAC sobre líquido."
 )
 
 # ------------------------------------------------------------------
 # Filtros
 # ------------------------------------------------------------------
+month_keys = data.available_month_keys()
 with st.container(border=True):
     f1, f2, f3, f4 = st.columns([2.4, 1.8, 2.4, 1.6])
     with f1:
         st.caption("PERÍODO")
         period = st.segmented_control("Período", ["7d", "30d", "90d"], default="30d", label_visibility="collapsed")
-        month = st.selectbox("Mês", ["—", "jul/26", "jun/26", "mai/26", "abr/26", "mar/26", "fev/26"],
+        month = st.selectbox("Mês", ["—"] + [data.month_label(mk) for mk in month_keys],
                               label_visibility="collapsed")
     with f2:
         st.caption("CANAL")
@@ -54,18 +55,20 @@ with st.container(border=True):
         st.caption("COMPARAR")
         compare = st.toggle("Δ vs período anterior", value=False)
 
-st.caption(f"ℹ️ Snapshot {snap['label']} · período/mês ainda não reprocessam o snapshot ilustrativo neste protótipo.")
+if month != "—":
+    period_key = month_keys[[data.month_label(mk) for mk in month_keys].index(month)]
+else:
+    period_key = period or "30d"
+d_ini, d_fim = data.period_window(period_key)
+
+st.caption(f"ℹ️ Snapshot {snap['label']} · janela selecionada: {d_ini} a {d_fim}.")
 
 # ------------------------------------------------------------------
 # KPIs
 # ------------------------------------------------------------------
-totals = data.compute_totals(canal_filter)
-prev = {
-    "liquido": totals["liquido"] * 0.958, "leads": totals["leads"] / 1.071, "vendas": totals["vendas"] / 1.035,
-    "cpl": totals["cpl"] * 1.024 if totals["cpl"] else None,
-    "cac": totals["cac"] / 1.018 if totals["cac"] else None,
-    "rate": totals["rate"] / 0.996 if totals["rate"] else None,
-}
+totals = data.compute_totals(d_ini, d_fim, canal_filter)
+prev_d_ini, prev_d_fim = data.previous_window(d_ini, d_fim)
+prev = data.compute_totals(prev_d_ini, prev_d_fim, canal_filter)
 
 
 def _delta(curr, prev_v, invert=False):
@@ -103,7 +106,7 @@ st.divider()
 if not canal_filter or canal_filter == "google":
     st.markdown('<h2 style="font-size:18px;">Funil completo Google '
                 '<span class="canal-tag google">google</span></h2>', unsafe_allow_html=True)
-    g_df = data.build_google_df()
+    g_df = data.build_google_df(d_ini, d_fim)
     step_keys, step_labels, min_cliques = data.funnel_step_config("google")
     st.markdown(tables.render_funnel_table(g_df, step_keys, step_labels, min_cliques), unsafe_allow_html=True)
     st.markdown(
@@ -117,7 +120,7 @@ if not canal_filter or canal_filter == "google":
 if not canal_filter or canal_filter == "meta":
     st.markdown('<h2 style="font-size:18px;">Funil completo Meta WhatsApp '
                 '<span class="canal-tag meta">meta</span></h2>', unsafe_allow_html=True)
-    m_df = data.build_meta_df()
+    m_df = data.build_meta_df(d_ini, d_fim)
     step_keys, step_labels, min_cliques = data.funnel_step_config("meta")
     st.markdown(tables.render_funnel_table(m_df, step_keys, step_labels, min_cliques), unsafe_allow_html=True)
     st.markdown(
@@ -134,7 +137,7 @@ st.divider()
 # Cobertura e Assertividade
 # ------------------------------------------------------------------
 st.markdown('<h2 style="font-size:18px;">Análise de Cobertura e Assertividade</h2>', unsafe_allow_html=True)
-cov_df = data.build_coverage_df(canal_filter)
+cov_df = data.build_coverage_df(d_ini, d_fim, canal_filter)
 st.markdown(tables.render_coverage_table(cov_df), unsafe_allow_html=True)
 st.caption("% Cashback: alto = lead caiu fora da cobertura do anunciante. "
            "% Assertividade = leads produtivos / Vol. base (Clickoff no Google, Chat start no Meta).")
@@ -189,7 +192,7 @@ st.divider()
 # Detalhamento consolidado
 # ------------------------------------------------------------------
 st.markdown('<h2 style="font-size:18px;">Detalhamento investimento × leads × vendas</h2>', unsafe_allow_html=True)
-detail_df = data.build_detail_df(canal_filter)
+detail_df = data.build_detail_df(d_ini, d_fim, canal_filter)
 st.markdown(tables.render_detail_table(detail_df), unsafe_allow_html=True)
 st.markdown(
     '<div class="legend-row"><span class="sw"><i style="background:var(--crit)"></i></span> pior que a mediana · '
