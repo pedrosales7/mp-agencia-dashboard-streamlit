@@ -35,12 +35,17 @@ st.caption(
 # ------------------------------------------------------------------
 month_keys = data.available_month_keys()
 with st.container(border=True):
-    f1, f2, f3, f4 = st.columns([2.4, 1.8, 2.4, 1.6])
+    f1, f2, f3, f4 = st.columns([2.8, 1.8, 2.4, 1.6])
     with f1:
         st.caption("PERÍODO")
         period = st.segmented_control("Período", ["7d", "30d", "90d"], default="30d", label_visibility="collapsed")
         month = st.selectbox("Mês", ["—"] + [data.month_label(mk) for mk in month_keys],
                               label_visibility="collapsed")
+        custom_range = st.date_input(
+            "Personalizado", value=(), format="DD/MM/YYYY", label_visibility="collapsed",
+            min_value=data.MIN_DATE, max_value=data.CUTOFF_DATE,
+            help="Selecione data inicial e final pra um período customizado — sobrepõe Período/Mês quando preenchido.",
+        )
     with f2:
         st.caption("CANAL")
         canal_label = st.segmented_control("Canal", ["Todos", "Google", "Meta"], default="Todos",
@@ -54,13 +59,21 @@ with st.container(border=True):
         st.caption("COMPARAR")
         compare = st.toggle("Δ vs período anterior", value=False)
 
-if month != "—":
-    period_key = month_keys[[data.month_label(mk) for mk in month_keys].index(month)]
+custom_invalid = len(custom_range) == 2 and custom_range[0] > custom_range[1]
+if len(custom_range) == 2 and not custom_invalid:
+    d_ini, d_fim = custom_range[0].isoformat(), custom_range[1].isoformat()
+    janela_label = f"período customizado ({d_ini} a {d_fim})"
 else:
-    period_key = period or "30d"
-d_ini, d_fim = data.period_window(period_key)
+    if custom_invalid:
+        st.warning("Data inicial é depois da final — período customizado ignorado, usando Período/Mês.")
+    if month != "—":
+        period_key = month_keys[[data.month_label(mk) for mk in month_keys].index(month)]
+    else:
+        period_key = period or "30d"
+    d_ini, d_fim = data.period_window(period_key)
+    janela_label = f"{d_ini} a {d_fim}"
 
-st.caption(f"ℹ️ Snapshot {snap['label']} · janela selecionada: {d_ini} a {d_fim}.")
+st.caption(f"ℹ️ Snapshot {snap['label']} · janela selecionada: {janela_label}.")
 
 # ------------------------------------------------------------------
 # KPIs

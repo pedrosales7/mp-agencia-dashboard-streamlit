@@ -44,6 +44,7 @@ CREDIT_TIMESERIES = SNAPSHOT["credit_timeseries"]
 
 CUTOFF = max(_daily_snapshot["dia"].max(), _daily_google["dia"].max(), _daily_meta["dia"].max())
 CUTOFF_DATE = date.fromisoformat(CUTOFF)
+MIN_DATE = date.fromisoformat(min(_daily_snapshot["dia"].min(), _daily_google["dia"].min(), _daily_meta["dia"].min()))
 
 
 # ------------------------------------------------------------------
