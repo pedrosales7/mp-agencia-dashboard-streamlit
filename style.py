@@ -19,6 +19,8 @@ CSS = """
 .snap-badge { display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:999px;
   font-size:11px; font-weight:700; margin-left:8px; vertical-align:2px; background:var(--good-bg); color:var(--good); }
 .snap-badge::before { content:"●"; font-size:8px; }
+.snap-badge.warn { background:var(--warn-bg); color:var(--warn); }
+.snap-badge.crit { background:var(--crit-bg); color:var(--crit); }
 
 .canal-tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:10.5px; font-weight:700; }
 .canal-tag.google { background: color-mix(in srgb, var(--google) 15%, transparent); color: var(--google); }
@@ -33,6 +35,7 @@ table.dk-table td { padding:7px 9px; border-bottom:1px solid var(--bd-soft); whi
 table.dk-table .partner-cell { font-weight:600; }
 table.dk-table .cell-conv { display:block; font-size:10px; color:var(--mut2); margin-top:1px; font-weight:500; }
 table.dk-table tr.tr-total td { background:var(--bd-soft); font-weight:700; }
+table.dk-table tr.tr-warn td { background:var(--warn-bg); }
 table.dk-table tr.tr-warn td:first-child { border-left:3px solid var(--warn); }
 table.dk-table th.canal-group.google { color:var(--google); border-bottom:2px solid var(--google); text-align:center; }
 table.dk-table th.canal-group.meta { color:var(--meta); border-bottom:2px solid var(--meta); text-align:center; }

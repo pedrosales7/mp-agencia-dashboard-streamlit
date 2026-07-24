@@ -14,7 +14,7 @@ exclusiva do weekly_refresh.py que roda no GitHub Actions.
 
 import json
 import math
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -45,6 +45,16 @@ CREDIT_TIMESERIES = SNAPSHOT["credit_timeseries"]
 CUTOFF = max(_daily_snapshot["dia"].max(), _daily_google["dia"].max(), _daily_meta["dia"].max())
 CUTOFF_DATE = date.fromisoformat(CUTOFF)
 MIN_DATE = date.fromisoformat(min(_daily_snapshot["dia"].min(), _daily_google["dia"].min(), _daily_meta["dia"].min()))
+
+SNAPSHOT_ISO = SNAPSHOT["snapshot"]["iso"]
+
+
+def snapshot_age_hours():
+    """Idade do snapshot em horas -- pro badge de frescor (verde <24h / amarelo
+    <72h / vermelho >=72h), mesmos thresholds do dashboard HTML."""
+    snap_dt = datetime.fromisoformat(SNAPSHOT_ISO)
+    now = datetime.now(snap_dt.tzinfo)
+    return (now - snap_dt).total_seconds() / 3600
 
 
 # ------------------------------------------------------------------
@@ -210,6 +220,40 @@ def compute_totals(d_ini, d_fim, canal_filter):
         "cpl": safe_div(liquido, leads), "cac": safe_div(liquido, vendas),
         "rate": safe_div(vendas, leads),
     }
+
+
+# ------------------------------------------------------------------
+# Detalhamento investimento x leads x vendas -- consolidado por partner
+# (soma Google + Meta quando canal_filter=None, igual ao renderDetailTable()
+# do HTML).
+# ------------------------------------------------------------------
+def build_detail_df(d_ini, d_fim, canal_filter):
+    parts = []
+    if not canal_filter or canal_filter == "google":
+        parts.append(_daily_snapshot[(_daily_snapshot["canal"] == "google") & _window_mask(_daily_snapshot, d_ini, d_fim)])
+    if not canal_filter or canal_filter == "meta":
+        parts.append(_daily_snapshot[(_daily_snapshot["canal"] == "meta") & _window_mask(_daily_snapshot, d_ini, d_fim)])
+    combined = pd.concat(parts) if parts else _daily_snapshot.iloc[0:0]
+    agg = combined.groupby("id_mp")[["bruto", "cashback", "leads", "vendas"]].sum() if len(combined) \
+        else pd.DataFrame(columns=["bruto", "cashback", "leads", "vendas"])
+    agg = agg.reindex(PARTNERS, fill_value=0).reset_index().rename(columns={"index": "id_mp"})
+    agg["liquido"] = agg["bruto"] - agg["cashback"]
+    agg["cpl"] = agg.apply(lambda r: safe_div(r["liquido"], r["leads"]), axis=1)
+    agg["cac"] = agg.apply(lambda r: safe_div(r["liquido"], r["vendas"]), axis=1)
+    agg["rate"] = agg.apply(lambda r: safe_div(r["vendas"], r["leads"]), axis=1)
+    return agg.sort_values("bruto", ascending=False)
+
+
+def detail_medians(df):
+    """Medianas pra outlier -- só partners com Leads >= 3 entram (mesma regra
+    do HTML)."""
+    peers = df[df["leads"] >= 3]
+    med_rate = median(peers["rate"].tolist())
+    cac_ok = peers[(peers["vendas"] > 0) & (peers["liquido"] > 0)]
+    med_cac = median(cac_ok["cac"].tolist()) if len(cac_ok) else None
+    cpl_ok = peers[peers["liquido"] > 0]
+    med_cpl = median(cpl_ok["cpl"].tolist()) if len(cpl_ok) else None
+    return med_rate, med_cac, med_cpl
 
 
 # ------------------------------------------------------------------
