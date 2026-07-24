@@ -1,0 +1,33 @@
+{
+  "snapshot": { "iso": "2026-07-21T08:37:00-03:00", "label": "21/07/26" },
+  "partner_colors": {
+    "Loga": "#2563eb",
+    "The Fiber": "#16a34a",
+    "Direct": "#f59e0b",
+    "Enove": "#7c3aed",
+    "Interplus": "#dc2626",
+    "Unifique": "#0891b2",
+    "Ultranet": "#db2777",
+    "Ativa Telecom": "#64748b"
+  },
+  "google_funnel": [
+    { "id_mp": "Loga",          "bruto": 46200, "cashback": 3700, "cliques": 8200, "sessoes": 7100, "clickoff": 1140, "redirect": 890, "leads": 312, "vendas": 89 },
+    { "id_mp": "The Fiber",     "bruto": 33800, "cashback": 2600, "cliques": 6100, "sessoes": 5300, "clickoff": 780,  "redirect": 610, "leads": 245, "vendas": 71 },
+    { "id_mp": "Interplus",     "bruto": 30100, "cashback": 2300, "cliques": 5400, "sessoes": 4600, "clickoff": 690,  "redirect": 520, "leads": 198, "vendas": 58 },
+    { "id_mp": "Direct",        "bruto": 24000, "cashback": 1900, "cliques": 4300, "sessoes": 3700, "clickoff": 540,  "redirect": 410, "leads": 167, "vendas": 42 },
+    { "id_mp": "Enove",         "bruto": 21000, "cashback": 1600, "cliques": 3900, "sessoes": 3300, "clickoff": 410,  "redirect": 290, "leads": 143, "vendas": 31 },
+    { "id_mp": "Unifique",      "bruto": 19200, "cashback": 2400, "cliques": 3400, "sessoes": 2900, "clickoff": 340,  "redirect": 240, "leads": 108, "vendas": 24 },
+    { "id_mp": "Ultranet",      "bruto": 16500, "cashback": 1300, "cliques": 2800, "sessoes": 2300, "clickoff": 210,  "redirect": 140, "leads": 76,  "vendas": 14 },
+    { "id_mp": "Ativa Telecom", "bruto": 13400, "cashback": 1000, "cliques": 2100, "sessoes": 1750, "clickoff": 98,   "redirect": 61,  "leads": 35,  "vendas": 13 }
+  ],
+  "meta_funnel": [
+    { "id_mp": "Loga",          "bruto": 28900, "cashback": 2100, "cliques": 15200, "chat_start": 2380, "zip_search": 2380, "redirect": 1810, "leads": 268, "vendas": 74 },
+    { "id_mp": "The Fiber",     "bruto": 21100, "cashback": 1500, "cliques": 11400, "chat_start": 1710, "zip_search": 1690, "redirect": 1240, "leads": 201, "vendas": 55 },
+    { "id_mp": "Interplus",     "bruto": 18800, "cashback": 1300, "cliques": 10100, "chat_start": 1414, "zip_search": 1390, "redirect": 990,  "leads": 165, "vendas": 44 },
+    { "id_mp": "Direct",        "bruto": 15000, "cashback": 1050, "cliques": 8200,  "chat_start": 1066, "zip_search": 1050, "redirect": 760,  "leads": 132, "vendas": 31 },
+    { "id_mp": "Enove",         "bruto": 13100, "cashback": 900,  "cliques": 7300,  "chat_start": 803,  "zip_search": 790,  "redirect": 560,  "leads": 104, "vendas": 21 },
+    { "id_mp": "Unifique",      "bruto": 12000, "cashback": 1400, "cliques": 6400,  "chat_start": 640,  "zip_search": 630,  "redirect": 440,  "leads": 74,  "vendas": 15 },
+    { "id_mp": "Ultranet",      "bruto": 10300, "cashback": 720,  "cliques": 5200,  "chat_start": 364,  "zip_search": 355,  "redirect": 230,  "leads": 48,  "vendas": 8  },
+    { "id_mp": "Ativa Telecom", "bruto": 8400,  "cashback": 560,  "cliques": 3900,  "chat_start": 195,  "zip_search": 188,  "redirect": 118,  "leads": 21,  "vendas": 7  }
+  ]
+}
