@@ -37,13 +37,18 @@ jobs:
           TEST_MODE: ${{ inputs.test_mode }}
           STREAMLIT_URL: ${{ vars.STREAMLIT_URL }}
           SLACK_MENTION_ON_ERROR: '<@U0753LAQU1F>'
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
         run: python scripts/weekly_refresh.py
 
       - name: Commit updated snapshot
         run: |
           git config user.name "mp-agencia-streamlit-bot"
           git config user.email "actions@github.com"
-          git add data/latest.json
+          # analysis.json e diagnosticos/ podem não existir (sem LLM_API_KEY a
+          # análise é pulada); ai_context.json é puro cálculo e sai sempre.
+          git add data/latest.json data/ai_context.json
+          git add data/analysis.json data/diagnosticos 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "Nada a commitar."
             exit 0

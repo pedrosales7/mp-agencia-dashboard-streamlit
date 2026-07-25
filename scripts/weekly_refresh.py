@@ -40,6 +40,8 @@ from datetime import date, timedelta
 
 import requests
 
+import ai_analysis
+
 # ── configuração ──────────────────────────────────────────────────────────
 
 METABASE_URL = os.environ["METABASE_URL"].rstrip("/")
@@ -57,6 +59,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 QUERIES_PATH = os.path.join(SCRIPT_DIR, "queries.sql")
 DATA_PATH = os.path.join(REPO_ROOT, "data", "latest.json")
+ANALYSIS_PATH = os.path.join(REPO_ROOT, "data", "analysis.json")
+CONTEXT_PATH = os.path.join(REPO_ROOT, "data", "ai_context.json")
 
 VALID_PARTNERS = ["loga-internet", "the fiber internet", "interplus internet", "direct internet",
                    "enove-fibra", "unifique", "ultranet-network", "ativa-telecom"]
@@ -141,7 +145,10 @@ def clean_daily_funnel_google(rows):
             continue
         out.append({
             "dia": norm_date(r["dia"]), "id_mp": label,
-            "cliques": r.get("cliques") or 0, "sessoes": r.get("sessoes") or 0,
+            # impressoes: a query sempre trouxe, o cleaner é que descartava. Sem
+            # ela não há CTR nem CPC no payload da análise IA (fix 2026-07-24).
+            "cliques": r.get("cliques") or 0, "impressoes": r.get("impressoes") or 0,
+            "sessoes": r.get("sessoes") or 0,
             "clickoff": r.get("clickoff") or 0, "redirect": r.get("redirect") or 0,
             "leads": r.get("leads") or 0, "vendas": r.get("vendas") or 0,
         })
@@ -156,7 +163,9 @@ def clean_daily_funnel_meta(rows):
             continue
         out.append({
             "dia": norm_date(r["dia"]), "id_mp": label,
-            "cliques": r.get("cliques") or 0, "chat_start": r.get("chat_start") or 0,
+            # ver nota em clean_daily_funnel_google
+            "cliques": r.get("cliques") or 0, "impressoes": r.get("impressoes") or 0,
+            "chat_start": r.get("chat_start") or 0,
             "zip_search": r.get("zip_search") or 0, "redirect": r.get("redirect") or 0,
             "leads": r.get("leads") or 0, "vendas": r.get("vendas") or 0,
         })
@@ -261,6 +270,32 @@ def main():
           f"daily_funnel_meta={len(daily_funnel_meta)} partner_weekly_partners={len(partner_weekly)} "
           f"credit_partners={len(credit_timeseries)}")
 
+    # ── contexto da IA (puro cálculo — sempre gravado) ────────────────────
+    # Vale independente da análise semanal: é o que a aba de chat carrega.
+    context = ai_analysis.build_context(daily_snapshot, daily_funnel_google, daily_funnel_meta,
+                                        cutoff_dt, sorted(PARTNER_LABELS.values()))
+    with open(CONTEXT_PATH, "w", encoding="utf-8") as f:
+        json.dump(context, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"Contexto da IA gravado ({os.path.getsize(CONTEXT_PATH) // 1024}KB).")
+
+    # ── análise IA (opcional — nunca derruba o refresh) ───────────────────
+    analysis_block = ""
+    if ai_analysis.enabled():
+        try:
+            result = ai_analysis.run(context, cutoff_dt, REPO_ROOT)
+            with open(ANALYSIS_PATH, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, separators=(",", ":"))
+            if result["avisos"]:
+                print("Avisos da análise: " + " · ".join(result["avisos"]))
+            analysis_block = f"\n🤖 *Análise da semana:*\n{result['blocos']['resumo_slack']}\n"
+            print(f"Análise IA ok ({len(result['blocos']['pareceres']) // 1024}KB de pareceres).")
+        except Exception as e:
+            print(f"Aviso: análise IA falhou ({type(e).__name__}: {e}) — refresh segue sem ela.",
+                  file=sys.stderr)
+            analysis_block = "\n_⚠️ Análise IA indisponível nesta semana._\n"
+    else:
+        print("LLM_API_KEY ausente — análise IA pulada.")
+
     dashboard_url = f"{STREAMLIT_URL}" if STREAMLIT_URL else None
     link_line = f"\n{dashboard_url}\n" if dashboard_url else "\n(link do Streamlit ainda não configurado)\n"
     prefix = "🧪 [TESTE — só você vê isso]\n" if TEST_MODE else ""
@@ -268,7 +303,7 @@ def main():
     slack_post(
         f"{prefix}📊 Dashboard MP Agência — Funil Ads-to-Sale, versão Streamlit ({cover})\n"
         f"Dados atualizados com snapshot de {cover}. Acesse o dashboard interativo:"
-        f"{link_line}{channel_mention}"
+        f"{link_line}{analysis_block}{channel_mention}"
     )
 
 
