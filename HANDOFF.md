@@ -47,9 +47,53 @@ e o cache inteiro que o script original tem.
 Ganho de brinde: "Δ vs período anterior" é cálculo real (janela anterior de
 mesmo tamanho via `data.previous_window()`), não estimativa.
 
+## Arquitetura de abas (desde 2026-07-24)
+
+O app virou hub de 3 abas sobre o MESMO snapshot. `app.py` é só o roteador.
+
+| Aba | Arquivo | Chama LLM em runtime? |
+|---|---|---|
+| Dashboard | `dashboard_view.py` | não |
+| Análise da semana | `analysis_view.py` | **não** — lê `data/analysis.json` |
+| Perguntar aos dados | `chat_view.py` | **sim** — Gemini a cada mensagem |
+
+**A separação não é estética, é de custo/segurança.** O app é público e o repo
+também. A análise é gerada 1x/semana dentro do GitHub Actions e o app só
+renderiza texto pronto — zero exposição. O chat é a única porta que gasta cota
+em runtime, e por isso o controle de acesso do Community Cloud (lista de
+e-mails, em Settings → Sharing) é o que de fato protege; o teto de 15 mensagens
+por sessão no `chat_view.py` é segunda linha, não a primeira.
+
+`LLM_API_KEY` precisa estar em DOIS lugares, com escopos diferentes:
+- secret do **repositório** → o refresh gera a análise semanal
+- secret do **app** (share.streamlit.io) → o chat funciona
+
+Sem o primeiro, o refresh roda e pula a análise. Sem o segundo, a aba de chat
+mostra como configurar em vez de quebrar.
+
+### Pipeline da análise (`scripts/ai_analysis.py`)
+
+Estágio 0 (triagem) é Python puro; 1 (diagnóstico, `responseSchema`, thinking
+alto) e 2 (redação, tags XML, thinking baixo) são Gemini. O estágio 2 **não
+recebe o payload** de propósito: sem números crus na mão, recitar o dashboard
+fica impossível, e todo número da prosa é conferido contra
+`evidencias_citadas` na validação.
+
+O diagnóstico vai pra `data/diagnosticos/AAAA-MM-DD.json` — entrada do estágio
+2 da semana seguinte (bloco "recomendei X, não mexeu") e registro auditável.
+
+`build_context()` é separado do `run()`: o payload+triagem é puro cálculo, vai
+pra `data/ai_context.json` sempre, e é também o contexto do chat. Assim o chat
+sobrevive a uma falha da análise.
+
+**Nunca rodou ponta a ponta.** Encanamento, validação e render foram testados
+com dado real; o texto que os estágios 1 e 2 produzem ainda não foi visto por
+ninguém. Rodar `-f test_mode=true` manda o resumo pro DM em vez do canal.
+
 ## Estrutura de arquivos
 
-- **`app.py`** — layout, filtros, todas as seções. Widgets nativos do Streamlit
+- **`app.py`** — roteador das 3 abas, só isso.
+- **`dashboard_view.py`** — layout, filtros, todas as seções do dashboard. Widgets nativos do Streamlit
   (segmented_control, multiselect, date_input em modo intervalo, toggle, metric).
 - **`data.py`** — carrega `data/latest.json`, todas as funções `build_*_df` e
   helpers de formatação/outlier/delta. **Fonte de verdade dos dados.**
@@ -104,15 +148,32 @@ tinha (foi construída a partir de uma cópia mais antiga). Já sincronizado:
 - Filtro de período customizado (`st.date_input` em modo intervalo — um único
   componente pra início+fim, diferente do HTML que usa 2 campos separados)
 
-### Ainda NÃO portado (decisão consciente, menor prioridade)
+### Feito em 2026-07-24 (Pedro apontou os 5 buracos numa passada)
 
-- **Seletor de partner inline** dentro de Progressão/Taxas/Evolução de
-  métricas, sincronizado com o filtro do topo (no HTML, 4 instâncias do mesmo
-  seletor ficam em sync via `syncPartnerSelectors()`). Em Streamlit isso exige
-  truques de `session_state` pra sincronizar múltiplos widgets com o mesmo
-  valor — complexidade alta pra um ganho de UX pequeno (só evita rolar até o
-  topo). Se o Pedro pedir, é o próximo item de usabilidade mais natural.
-- Cliclique-no-cabeçalho pra ordenar (ver acima — usamos selectbox em vez disso)
+- **Ordenação por clique no cabeçalho** — as 3 tabelas densas (Funil Google,
+  Funil Meta, Detalhamento) passaram de `st.markdown` para
+  `st.components.v1.html`, que permite `<script>`. Os selectbox "Ordenar por"
+  + Desc/Asc foram removidos (o Pedro não entendia o que eram — apareciam como
+  dropdown solto sem label). Cada `<td>` carrega `data-sort` com o valor cru,
+  porque "R$ 2.780" e "84,8%" não ordenam como número; a linha TOTAL tem
+  `data-pin="1"` e fica fixa no fim; célula sem base ordena por último nos dois
+  sentidos. Nas colunas de etapa o `data-sort` é a TAXA, não o volume — é o que
+  a coluna comunica.
+  Custo do iframe: não herda o CSS da página (vai injetado junto em
+  `sortable_doc`) e não cresce com o conteúdo, então a altura é calculada em
+  `sortable_table_height()` — as constantes `ROW_H_FUNNEL=42` / `ROW_H_PLAIN=30`
+  foram medidas no browser. Mexeu no layout da célula, remede.
+- **Outlier vs. mediana virou célula pintada** (`td.bad` / `td.good`, cores
+  `#fef2f2` / `#f0fdf4` — as mesmas do HTML). A lógica sempre existiu e estava
+  certa; o que não dava era enxergar, porque o tema "Sinalização" renderizava
+  como um ponto de 6px. Isso reverte parcialmente aquela decisão de design,
+  de propósito: alerta que não é lido de relance não é alerta.
+- **Seletor de partner inline** em Progressão, Evolução das taxas e Evolução de
+  métricas (`_inline_partners`). Sem os truques de `session_state` que a versão
+  anterior deste handoff previa: a key do widget embute o filtro do topo
+  (`f"{prefixo}_partners_{stamp}"`), então mudar o topo recria o widget e ele
+  volta a herdar, em vez de ficar preso num valor velho. Mexer no seletor da
+  seção vale só pra ela.
 
 ## Gotchas / decisões que não devem ser revisitadas sem motivo
 
