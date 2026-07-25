@@ -6,7 +6,14 @@ sparkline inline, então isso é HTML puro, renderizado via st.markdown.
 import math
 
 from data import fmt_brl, fmt_num, fmt_pct, safe_div, outlier_status, funnel_medians, taxa_value, TAXAS_MIN_DENOM
-from style import status_dot, sparkline_svg
+from style import sparkline_svg
+
+
+def _ds(v):
+    """data-sort com o valor cru. Vazio quando não há número (vira o fim da ordem)."""
+    if v is None or (isinstance(v, float) and not math.isfinite(v)):
+        return 'data-sort=""'
+    return f'data-sort="{float(v):.6f}"'
 
 
 def _delta_pct(curr, prev, semantic):
@@ -42,7 +49,11 @@ def render_funnel_table(df, step_keys, step_labels, min_cliques, prev_df=None, c
     meds = funnel_medians(df, step_keys, min_cliques)
     head = ["Partner", "Bruto", "Cashback", "Líquido", "CPC", "Cliques", *step_labels,
             "CPL líq.", "CAC líq.", "Cliques→Venda"]
-    html = ['<table class="dk-table"><thead><tr>'] + [f"<th>{h}</th>" for h in head] + ["</tr></thead><tbody>"]
+    # data-sort carrega o valor CRU: a célula mostra "R$ 2.780" e "84,8%", que
+    # não ordenam como número. O JS do iframe lê o data-sort, não o texto.
+    html = (['<table class="dk-table sortable"><thead><tr>']
+            + [f'<th data-type="{"text" if i == 0 else "num"}">{h}</th>' for i, h in enumerate(head)]
+            + ["</tr></thead><tbody>"])
 
     prev_by_id = {r["id_mp"]: r for _, r in prev_df.iterrows()} if compare and prev_df is not None else {}
 
@@ -51,12 +62,12 @@ def render_funnel_table(df, step_keys, step_labels, min_cliques, prev_df=None, c
         pr = prev_by_id.get(r["id_mp"])
         eligible = r["cliques"] >= min_cliques
         cells = [
-            f'<td class="partner-cell">{r["id_mp"]}</td>',
-            f'<td>{fmt_brl(r["bruto"])}{_delta_pct(r["bruto"], pr["bruto"] if pr is not None else None, "neutral")}</td>',
-            f'<td>{fmt_brl(r["cashback"])}{_delta_pct(r["cashback"], pr["cashback"] if pr is not None else None, "neutral")}</td>',
-            f'<td>{fmt_brl(r["liquido"])}{_delta_pct(r["liquido"], pr["liquido"] if pr is not None else None, "neutral")}</td>',
-            f'<td>{fmt_brl(r["cpc"], 2)}{_delta_pct(r["cpc"], pr["cpc"] if pr is not None else None, "down_good")}</td>',
-            f'<td>{fmt_num(r["cliques"])}{_delta_pct(r["cliques"], pr["cliques"] if pr is not None else None, "up_good")}</td>',
+            f'<td class="partner-cell" data-sort="{r["id_mp"]}">{r["id_mp"]}</td>',
+            f'<td {_ds(r["bruto"])}>{fmt_brl(r["bruto"])}{_delta_pct(r["bruto"], pr["bruto"] if pr is not None else None, "neutral")}</td>',
+            f'<td {_ds(r["cashback"])}>{fmt_brl(r["cashback"])}{_delta_pct(r["cashback"], pr["cashback"] if pr is not None else None, "neutral")}</td>',
+            f'<td {_ds(r["liquido"])}>{fmt_brl(r["liquido"])}{_delta_pct(r["liquido"], pr["liquido"] if pr is not None else None, "neutral")}</td>',
+            f'<td {_ds(r["cpc"])}>{fmt_brl(r["cpc"], 2)}{_delta_pct(r["cpc"], pr["cpc"] if pr is not None else None, "down_good")}</td>',
+            f'<td {_ds(r["cliques"])}>{fmt_num(r["cliques"])}{_delta_pct(r["cliques"], pr["cliques"] if pr is not None else None, "up_good")}</td>',
         ]
         denom = r["cliques"]
         prev_denom = pr["cliques"] if pr is not None else None
@@ -70,17 +81,18 @@ def render_funnel_table(df, step_keys, step_labels, min_cliques, prev_df=None, c
                 delta_html = _delta_pp(conv, prev_conv, "up_good")
             else:
                 delta_html = ""
-            cells.append(f'<td>{status_dot(cls)}{fmt_num(val)}{conv_html}{delta_html}</td>')
+            # ordena pela TAXA de conversão, não pelo volume: é o que a coluna comunica
+            cells.append(f'<td class="{cls or ""}" {_ds(conv)}>{fmt_num(val)}{conv_html}{delta_html}</td>')
             denom = val
             prev_denom = pr[k] if pr is not None else None
         cls_cpl = outlier_status(r["cpl"], meds["cpl"], "cost") if eligible and r["leads"] >= 3 else None
         cls_cac = outlier_status(r["cac"], meds["cac"], "cost") if eligible else None
         cls_conv = outlier_status(r["conv_final"], meds["conv_final"], "rate") if eligible else None
-        cells.append(f'<td>{status_dot(cls_cpl)}{fmt_brl(r["cpl"])}'
+        cells.append(f'<td class="{cls_cpl or ""}" {_ds(r["cpl"])}>{fmt_brl(r["cpl"])}'
                      f'{_delta_pct(r["cpl"], pr["cpl"] if pr is not None else None, "down_good")}</td>')
-        cells.append(f'<td>{status_dot(cls_cac)}{fmt_brl(r["cac"])}'
+        cells.append(f'<td class="{cls_cac or ""}" {_ds(r["cac"])}>{fmt_brl(r["cac"])}'
                      f'{_delta_pct(r["cac"], pr["cac"] if pr is not None else None, "down_good")}</td>')
-        cells.append(f'<td>{status_dot(cls_conv)}{fmt_pct(r["conv_final"])}'
+        cells.append(f'<td class="{cls_conv or ""}" {_ds(r["conv_final"])}>{fmt_pct(r["conv_final"])}'
                      f'{_delta_pct(r["conv_final"], pr["conv_final"] if pr is not None else None, "up_good")}</td>')
         html.append("<tr>" + "".join(cells) + "</tr>")
 
@@ -99,7 +111,7 @@ def render_funnel_table(df, step_keys, step_labels, min_cliques, prev_df=None, c
     tot_cells.append(f'<td>{fmt_brl(safe_div(tot_liquido, tot_leads))}</td>')
     tot_cells.append(f'<td>{fmt_brl(safe_div(tot_liquido, tot_vendas))}</td>')
     tot_cells.append(f'<td>{fmt_pct(safe_div(tot_vendas, totals["cliques"]))}</td>')
-    html.append('<tr class="tr-total">' + "".join(tot_cells) + "</tr>")
+    html.append('<tr class="tr-total" data-pin="1">' + "".join(tot_cells) + "</tr>")
     html.append("</tbody></table>")
     return "".join(html)
 
@@ -110,7 +122,11 @@ def render_detail_table(df, meds, prev_df=None, compare=False):
     investimento sem gerar lead) -- mesmo alerta do HTML."""
     med_rate, med_cac, med_cpl = meds
     head = ["Partner", "Bruto", "Cashback", "Líquido", "Leads", "Vendas", "CPL líq.", "CAC líq.", "Lead→Venda"]
-    html = ['<table class="dk-table"><thead><tr>'] + [f"<th>{h}</th>" for h in head] + ["</tr></thead><tbody>"]
+    # data-sort carrega o valor CRU: a célula mostra "R$ 2.780" e "84,8%", que
+    # não ordenam como número. O JS do iframe lê o data-sort, não o texto.
+    html = (['<table class="dk-table sortable"><thead><tr>']
+            + [f'<th data-type="{"text" if i == 0 else "num"}">{h}</th>' for i, h in enumerate(head)]
+            + ["</tr></thead><tbody>"])
 
     prev_by_id = {r["id_mp"]: r for _, r in prev_df.iterrows()} if compare and prev_df is not None else {}
 
@@ -123,17 +139,17 @@ def render_detail_table(df, meds, prev_df=None, compare=False):
         cls_cac = outlier_status(r["cac"], med_cac, "cost") if eligible and r["vendas"] > 0 else None
         cls_cpl = outlier_status(r["cpl"], med_cpl, "cost") if eligible else None
         cells = [
-            f'<td class="partner-cell">{r["id_mp"]}</td>',
-            f'<td>{fmt_brl(r["bruto"])}</td>',
-            f'<td>{fmt_brl(r["cashback"])}</td>',
-            f'<td>{fmt_brl(r["liquido"])}</td>',
-            f'<td>{fmt_num(r["leads"])}{_delta_pct(r["leads"], pr["leads"] if pr is not None else None, "up_good")}</td>',
-            f'<td>{fmt_num(r["vendas"])}{_delta_pct(r["vendas"], pr["vendas"] if pr is not None else None, "up_good")}</td>',
-            f'<td>{status_dot(cls_cpl)}{fmt_brl(r["cpl"])}'
+            f'<td class="partner-cell" data-sort="{r["id_mp"]}">{r["id_mp"]}</td>',
+            f'<td {_ds(r["bruto"])}>{fmt_brl(r["bruto"])}</td>',
+            f'<td {_ds(r["cashback"])}>{fmt_brl(r["cashback"])}</td>',
+            f'<td {_ds(r["liquido"])}>{fmt_brl(r["liquido"])}</td>',
+            f'<td {_ds(r["leads"])}>{fmt_num(r["leads"])}{_delta_pct(r["leads"], pr["leads"] if pr is not None else None, "up_good")}</td>',
+            f'<td {_ds(r["vendas"])}>{fmt_num(r["vendas"])}{_delta_pct(r["vendas"], pr["vendas"] if pr is not None else None, "up_good")}</td>',
+            f'<td class="{cls_cpl or ""}" {_ds(r["cpl"])}>{fmt_brl(r["cpl"])}'
             f'{_delta_pct(r["cpl"], pr["cpl"] if pr is not None else None, "down_good")}</td>',
-            f'<td>{status_dot(cls_cac)}{fmt_brl(r["cac"])}'
+            f'<td class="{cls_cac or ""}" {_ds(r["cac"])}>{fmt_brl(r["cac"])}'
             f'{_delta_pct(r["cac"], pr["cac"] if pr is not None else None, "down_good")}</td>',
-            f'<td>{status_dot(cls_rate)}{fmt_pct(r["rate"])}'
+            f'<td class="{cls_rate or ""}" {_ds(r["rate"])}>{fmt_pct(r["rate"])}'
             f'{_delta_pct(r["rate"], pr["rate"] if pr is not None else None, "up_good")}</td>',
         ]
         html.append(f'<tr class="{"tr-warn" if warn else ""}">' + "".join(cells) + "</tr>")
@@ -149,7 +165,7 @@ def render_detail_table(df, meds, prev_df=None, compare=False):
         f'<td>{fmt_brl(safe_div(tot_liquido, totals["vendas"]))}</td>',
         f'<td>{fmt_pct(safe_div(totals["vendas"], totals["leads"]))}</td>',
     ]
-    html.append('<tr class="tr-total">' + "".join(tot_cells) + "</tr>")
+    html.append('<tr class="tr-total" data-pin="1">' + "".join(tot_cells) + "</tr>")
     html.append("</tbody></table>")
     return "".join(html)
 
@@ -172,10 +188,10 @@ def render_coverage_table(df):
             return "<td>—</td><td>—</td><td>—</td><td>—</td>"
         asr_html = fmt_pct(r[f"{prefix}_pct_assert"]) if r[f"{prefix}_elig_asr"] else "—"
         return (
-            f'<td>{status_dot(r[f"{prefix}_status_cash"])}{fmt_pct(r[f"{prefix}_pct_cashback"])}</td>'
+            f'<td class="{r[f"{prefix}_status_cash"] or ""}">{fmt_pct(r[f"{prefix}_pct_cashback"])}</td>'
             f'<td>{fmt_num(r[f"{prefix}_total_leads"])}</td>'
             f'<td>{fmt_num(r[f"{prefix}_covered_leads"])}</td>'
-            f'<td>{status_dot(r[f"{prefix}_status_asr"])}{asr_html}</td>'
+            f'<td class="{r[f"{prefix}_status_asr"] or ""}">{asr_html}</td>'
         )
 
     for _, r in df.iterrows():
@@ -246,3 +262,94 @@ def render_taxas_block(df, stages, gran_label):
         html.append(f'<td>{_taxas_delta(vals[-1], vals[-2] if len(vals) > 1 else None)}</td></tr>')
     html.append("</tbody></table>")
     return "".join(html)
+
+
+# ── tabela ordenável por clique no cabeçalho ─────────────────────────────
+#
+# A tabela é HTML puro (o Streamlit não tem widget com % de conversão embaixo
+# do número, delta e linha TOTAL numa célula só). O st.markdown remove <script>,
+# então a ordenação por clique só é possível dentro de um components.v1.html,
+# que roda num iframe com JS liberado. Custo: o iframe não herda o CSS da
+# página, por isso o CSS vai injetado junto; e a altura tem que ser calculada,
+# porque iframe não cresce sozinho com o conteúdo.
+
+SORT_JS = """
+<script>
+(function () {
+  var table = document.querySelector('table.sortable');
+  if (!table) return;
+  var ths = table.tHead.rows[0].cells;
+
+  function val(row, i) {
+    var td = row.cells[i];
+    var raw = td.getAttribute('data-sort');
+    if (raw === null) return td.innerText.trim();
+    if (raw === '') return null;               // sem base: sempre no fim
+    var n = parseFloat(raw);
+    return isNaN(n) ? raw : n;
+  }
+
+  function sortBy(i, asc) {
+    var body = table.tBodies[0];
+    var rows = [].slice.call(body.rows);
+    var pinned = rows.filter(function (r) { return r.dataset.pin; });
+    var data = rows.filter(function (r) { return !r.dataset.pin; });
+    data.sort(function (a, b) {
+      var x = val(a, i), y = val(b, i);
+      if (x === null && y === null) return 0;
+      if (x === null) return 1;                // nulo vai pro fim nos dois sentidos
+      if (y === null) return -1;
+      var c = (typeof x === 'number' && typeof y === 'number')
+              ? x - y : String(x).localeCompare(String(y), 'pt-BR');
+      return asc ? c : -c;
+    });
+    data.concat(pinned).forEach(function (r) { body.appendChild(r); });
+    for (var k = 0; k < ths.length; k++) ths[k].removeAttribute('data-dir');
+    ths[i].setAttribute('data-dir', asc ? 'asc' : 'desc');
+  }
+
+  for (var i = 0; i < ths.length; i++) {
+    (function (idx) {
+      ths[idx].addEventListener('click', function () {
+        var asc = ths[idx].getAttribute('data-dir') !== 'asc';
+        sortBy(idx, asc);
+      });
+    })(i);
+  }
+})();
+</script>
+"""
+
+SORT_CSS = """
+<style>
+  body { margin:0; background:transparent; }
+  table.sortable th { cursor:pointer; user-select:none; position:relative; padding-right:14px !important; }
+  table.sortable th:hover { color:var(--ink); }
+  table.sortable th::after { content:"⇅"; position:absolute; right:4px; opacity:.25; font-size:9px; }
+  table.sortable th[data-dir="asc"]::after  { content:"▲"; opacity:.85; }
+  table.sortable th[data-dir="desc"]::after { content:"▼"; opacity:.85; }
+</style>
+"""
+
+
+# Altura de linha medida no browser: o funil tem a taxa de conversão numa
+# segunda linha dentro da célula, o detalhamento não. Com "Comparar" ligado
+# entra mais um span de delta, que empurra um pouco.
+ROW_H_FUNNEL = 42
+ROW_H_PLAIN = 30
+ROW_H_COMPARE_EXTRA = 10
+
+
+def sortable_table_height(n_rows, row_h=ROW_H_FUNNEL, compare=False):
+    """Altura do iframe: cabeçalho + linhas + TOTAL + folga.
+
+    Iframe não cresce com o conteúdo, então a altura é calculada. Errar pra
+    baixo corta a tabela; errar pra cima deixa buraco branco — por isso a
+    folga é pequena e o scrolling fica ligado como rede de segurança.
+    """
+    return 24 + (n_rows + 1) * (row_h + (ROW_H_COMPARE_EXTRA if compare else 0)) + 10
+
+
+def sortable_doc(table_html, base_css):
+    """Documento completo do iframe: CSS da página + CSS/JS de ordenação."""
+    return f"{base_css}{SORT_CSS}<div class='dk-wrap'>{table_html}</div>{SORT_JS}"

@@ -41,12 +41,22 @@ table.dk-table th.canal-group.google { color:var(--google); border-bottom:2px so
 table.dk-table th.canal-group.meta { color:var(--meta); border-bottom:2px solid var(--meta); text-align:center; }
 table.dk-table td.taxas-raw { color:var(--mut2); font-style:italic; cursor:help; }
 
+/* Outlier vs. mediana: célula pintada, mesmas cores do dashboard HTML
+   (decisão 2026-07-24 — o ponto de 6px do tema "Sinalização" era pequeno
+   demais pra ser lido de relance, que é o ponto inteiro do alerta). */
+table.dk-table td.bad  { background:#fef2f2; }
+table.dk-table td.good { background:#f0fdf4; }
+table.dk-table td.bad  .cell-conv { color:#b91c1c; }
+table.dk-table td.good .cell-conv { color:#15803d; }
+
 .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px; vertical-align:1px; }
 .status-dot.good { background: var(--good); } .status-dot.bad { background: var(--crit); }
 
 .legend-row { display:flex; gap:14px; align-items:center; font-size:11.5px; color:var(--mut); margin-top:6px; flex-wrap:wrap; }
 .legend-row .sw { display:inline-flex; align-items:center; gap:5px; }
 .legend-row .sw i { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.legend-row .sw i.good { background:#f0fdf4; border:1px solid #bbf7d0; }
+.legend-row .sw i.bad  { background:#fef2f2; border:1px solid #fecaca; }
 
 .empty-hint { padding:22px 10px; text-align:center; color:var(--mut); font-size:13px;
   border:1px dashed var(--bd); border-radius:10px; }
