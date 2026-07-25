@@ -83,16 +83,27 @@ if custom_start_qp and custom_end_qp:
         custom_default = ()
 
 with st.container(border=True):
-    f1, f2, f3, f4 = st.columns([2.8, 1.8, 2.4, 1.6])
+    f1, f2, f3, f4 = st.columns([3.2, 1.4, 2.2, 1.4])
     with f1:
         st.caption("PERÍODO")
-        period = st.segmented_control("Período", ["7d", "30d", "90d"], default=period_qp, label_visibility="collapsed")
-        month = st.selectbox("Mês", month_options, index=month_options.index(month_qp), label_visibility="collapsed")
-        custom_range = st.date_input(
-            "Personalizado", value=custom_default, format="DD/MM/YYYY", label_visibility="collapsed",
-            min_value=data.MIN_DATE, max_value=data.CUTOFF_DATE,
-            help="Selecione data inicial e final pra um período customizado — sobrepõe Período/Mês quando preenchido.",
-        )
+        p1, p2 = st.columns([1.6, 1], gap="small")
+        with p1:
+            period = st.segmented_control("Período", ["7d", "30d", "90d"], default=period_qp,
+                                           label_visibility="collapsed")
+        with p2:
+            if custom_default:
+                pop_label = f"📅 {custom_default[0].strftime('%d/%m')}–{custom_default[1].strftime('%d/%m')}"
+            elif month_qp != "—":
+                pop_label = f"📅 {month_qp}"
+            else:
+                pop_label = "📅 outro"
+            with st.popover(pop_label, use_container_width=True, help="Filtrar por mês fechado ou período customizado"):
+                month = st.selectbox("Mês", month_options, index=month_options.index(month_qp))
+                custom_range = st.date_input(
+                    "Período customizado", value=custom_default, format="DD/MM/YYYY",
+                    min_value=data.MIN_DATE, max_value=data.CUTOFF_DATE,
+                    help="Selecione data inicial e final — sobrepõe Período/Mês quando preenchido.",
+                )
     with f2:
         st.caption("CANAL")
         canal_label = st.segmented_control("Canal", ["Todos", "Google", "Meta"], default=canal_qp,

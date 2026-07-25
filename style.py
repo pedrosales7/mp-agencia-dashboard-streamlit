@@ -62,6 +62,17 @@ table.dk-table td.taxas-raw { color:var(--mut2); font-style:italic; cursor:help;
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] > div[data-testid="stMetric"]) {
   background: var(--cd); border-color: var(--bd) !important; border-radius: 10px; padding: 10px 14px 8px;
 }
+
+/* Streamlit injeta um botão de anchor-link (🔗) em todo h1-h6 renderizado via
+   st.markdown -- inclusive nos nossos títulos com HTML puro. Sem uso aqui
+   (não linkamos pra seções por âncora), então some com ele. */
+[data-testid="stHeaderActionElements"] { display: none !important; }
+
+/* Botão do popover "Mês/custom" no filtro de período -- sem quebra de linha,
+   trunca com reticências se o texto (ex.: intervalo de datas) não couber. */
+button[data-testid="stPopoverButton"] p {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
 </style>
 """
 
