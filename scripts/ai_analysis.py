@@ -97,13 +97,21 @@ def weekly_series(all_daily, all_dfg, all_dfm, cutoff_dt, valid_partners, n_week
                 k = (r["id_mp"], canal, _week_start(r["dia"]))
                 for f in ("liquido", "leads", "vendas"):
                     agg[k][f] += r.get(f) or 0
+    # etapas do funil também entram na série: sem elas não dá pra dizer QUAL etapa
+    # moveu o CAC de uma semana pra outra, que é o "isso aconteceu porque a taxa de
+    # redirect>lead melhorou" que o time de mídia pediu.
     for rows, canal in ((all_dfg, "google"), (all_dfm, "meta")):
+        campos = ("cliques", "impressoes") + STAGE_COLS[canal]
         for r in rows:
             if r["id_mp"] in valid_partners and ini <= r["dia"] <= fim:
                 for c in (canal, "total"):
                     k = (r["id_mp"], c, _week_start(r["dia"]))
-                    for f in ("cliques", "impressoes"):
+                    for f in campos:
                         agg[k][f] += r.get(f) or 0
+                    # atribuição do funil (por campanha/chat) é diferente da do
+                    # snapshot (por partner_id_partner). A taxa redirect>leads
+                    # tem que usar a MESMA base do redirect, senão passa de 100%.
+                    agg[k]["leads_funil"] += r.get("leads") or 0
 
     out = {}
     for p in valid_partners:
@@ -114,16 +122,42 @@ def weekly_series(all_daily, all_dfg, all_dfm, cutoff_dt, valid_partners, n_week
                 liq = round(v.get("liquido", 0))
                 leads, vendas = int(v.get("leads", 0)), int(v.get("vendas", 0))
                 cliques, impr = int(v.get("cliques", 0)), int(v.get("impressoes", 0))
-                serie.append({
+                sem = {
                     "ws": ws, "liquido": liq, "leads": leads, "vendas": vendas,
                     "cliques": cliques, "impressoes": impr,
                     "cpl": _ratio(liq, leads), "cac": _ratio(liq, vendas),
                     "ctr_pct": round(100 * cliques / impr, 2) if impr else None,
-                })
+                    "cpc": _ratio(liq, cliques),
+                }
+                sem["leads_funil"] = int(v.get("leads_funil", 0))
+                if canal in STAGE_DEFS_WEEK:
+                    for de, para in STAGE_DEFS_WEEK[canal]:
+                        d_val = cliques if de == "cliques" else int(v.get(de, 0))
+                        p_val = (sem["leads_funil"] if para == "leads"
+                                 else int(v.get(para, 0)))
+                        sem[f"taxa_{de}>{para}"] = (round(100 * p_val / d_val, 1)
+                                                    if d_val else None)
+                sem["taxa_lead_venda"] = round(100 * vendas / leads, 1) if leads else None
+                serie.append(sem)
             if any(s["liquido"] or s["leads"] or s["cliques"] for s in serie):
                 out.setdefault(p, {})[canal] = serie
     return out
 
+
+# Só as etapas que existem APENAS no funil. `leads`/`vendas` NÃO entram aqui:
+# já vêm do DAILY_SNAPSHOT e somar de novo dobrava o número (bug pego em
+# 2026-07-27 — a taxa redirect>leads dava 259%, e as vendas semanais da Ultranet
+# apareciam como 8 quando eram 4).
+STAGE_COLS = {
+    "google": ("sessoes", "clickoff", "redirect"),
+    "meta": ("chat_start", "zip_search", "redirect"),
+}
+STAGE_DEFS_WEEK = {
+    "google": (("cliques", "sessoes"), ("sessoes", "clickoff"),
+               ("clickoff", "redirect"), ("redirect", "leads")),
+    "meta": (("cliques", "chat_start"), ("chat_start", "zip_search"),
+             ("zip_search", "redirect"), ("redirect", "leads")),
+}
 
 TREND_FIELDS = ("leads", "vendas", "cpl", "cac", "cliques", "ctr_pct")
 
@@ -425,8 +459,181 @@ def build_payload(all_daily, all_dfg, all_dfm, cutoff_dt, valid_partners):
         "funil_meta_por_partner": funil_meta,
         "serie_semanal_por_partner": semanal,
         "tendencia_semanal_por_partner": tendencia_semanal,
+        "comparativo_semana_vs_semana": comparativo_semanal(series),
         "benchmark_pre_clique_30d": benchmark,
         "gargalo_funil_30d": gargalo_funil,
+    }
+
+
+
+# ── comparativo semana vs semana ──────────────────────────────────────────
+#
+# Pedido direto do time de mídia (2026-07-27): "o CAC cresceu X% e quem mais
+# contribuiu foi A, B e C" e, por provedor, "caiu em qual canal e por causa de
+# quê". Tudo calculado aqui — é aritmética de decomposição, exatamente o que o
+# modelo não pode fazer sem inventar número.
+#
+# Trava de base: com 1 venda/semana o CAC semanal de uma conta pequena vira
+# ruído (uma venda a mais move 100%). Abaixo do mínimo o campo sai com
+# base_suficiente=False e o prompt proíbe narrar a variação.
+
+MIN_VENDAS_SEMANA = 3
+MIN_LEADS_SEMANA = 10
+
+
+def _delta_pct(atual, anterior, exige_positivo=False):
+    """Variação relativa. `exige_positivo` para métricas de custo.
+
+    Líquido = bruto − cashback pode ficar NEGATIVO quando o cashback supera o
+    bruto (Ativa Telecom, 97% de cashback). Aí CPC/CPL/CAC ficam negativos e a
+    variação percentual vira número sem sentido — deu "cpc -201%" no teste.
+    """
+    if atual is None or anterior is None or not anterior:
+        return None
+    if exige_positivo and (atual <= 0 or anterior <= 0):
+        return None
+    return round(100 * (atual - anterior) / abs(anterior), 1)
+
+
+def _delta_pp(atual, anterior):
+    if atual is None or anterior is None:
+        return None
+    return round(atual - anterior, 1)
+
+
+MIN_DENOM_ETAPA = 10   # abaixo disso a taxa da etapa oscila por 1-2 eventos
+
+
+def _denom_etapa(sem, de):
+    return sem.get("cliques", 0) if de == "cliques" else int(sem.get(de) or 0)
+
+
+def _driver(sem, prev, canal):
+    """Qual alavanca mais se moveu: etapa do funil, CPC ou volume de investimento.
+
+    Etapas são comparadas entre si em pontos percentuais (mesma unidade); CPC e
+    investimento entram como candidatos separados, em variação relativa. O campo
+    `principal` aponta a maior movimentação com base, e é o que o parecer deve
+    citar como causa.
+    """
+    etapas = {}
+    for de, para in STAGE_DEFS_WEEK.get(canal, ()):
+        # sem base no denominador nas DUAS semanas a taxa vira ruído: com 3
+        # cliques, um evento a mais move 33pp e o parecer narra isso como causa
+        if min(_denom_etapa(sem, de), _denom_etapa(prev, de)) < MIN_DENOM_ETAPA:
+            continue
+        d = _delta_pp(sem.get(f"taxa_{de}>{para}"), prev.get(f"taxa_{de}>{para}"))
+        if d is not None:
+            etapas[f"{de}>{para}"] = d
+    if min(sem.get("leads", 0), prev.get("leads", 0)) >= MIN_DENOM_ETAPA:
+        lv = _delta_pp(sem.get("taxa_lead_venda"), prev.get("taxa_lead_venda"))
+        if lv is not None:
+            etapas["lead>venda"] = lv
+
+    out = {
+        "etapas_delta_pp": etapas,
+        "cpc_delta_pct": _delta_pct(sem.get("cpc"), prev.get("cpc"), exige_positivo=True),
+        "investimento_delta_pct": _delta_pct(sem.get("liquido"), prev.get("liquido"),
+                                             exige_positivo=True),
+        "cliques_delta_pct": _delta_pct(sem.get("cliques"), prev.get("cliques")),
+    }
+    if etapas:
+        nome, valor = max(etapas.items(), key=lambda kv: abs(kv[1]))
+        # etapa só vira "a causa" se moveu de verdade; senão o driver é custo/volume
+        if abs(valor) >= 3.0:
+            out["principal"] = {"tipo": "taxa_de_conversao", "onde": nome, "delta_pp": valor}
+            return out
+    cands = [("cpc", out["cpc_delta_pct"]), ("investimento", out["investimento_delta_pct"])]
+    cands = [(n, v) for n, v in cands if v is not None and abs(v) >= 10]
+    if cands:
+        nome, valor = max(cands, key=lambda kv: abs(kv[1]))
+        out["principal"] = {"tipo": nome, "onde": nome, "delta_pct": valor}
+    else:
+        out["principal"] = None
+    return out
+
+
+def _bloco_semana(sem, prev, canal):
+    vendas, vendas_prev = sem["vendas"], prev["vendas"]
+    leads, leads_prev = sem["leads"], prev["leads"]
+    base_cac = vendas >= MIN_VENDAS_SEMANA and vendas_prev >= MIN_VENDAS_SEMANA
+    base_cpl = leads >= MIN_LEADS_SEMANA and leads_prev >= MIN_LEADS_SEMANA
+    return {
+        "liquido": sem["liquido"], "liquido_anterior": prev["liquido"],
+        "leads": leads, "leads_anterior": leads_prev,
+        "vendas": vendas, "vendas_anterior": vendas_prev,
+        "cac": sem["cac"], "cac_anterior": prev["cac"],
+        "cac_delta_pct": _delta_pct(sem["cac"], prev["cac"], exige_positivo=True) if base_cac else None,
+        "cac_base_suficiente": base_cac,
+        "cpl": sem["cpl"], "cpl_anterior": prev["cpl"],
+        "cpl_delta_pct": _delta_pct(sem["cpl"], prev["cpl"], exige_positivo=True) if base_cpl else None,
+        "cpl_base_suficiente": base_cpl,
+        "motivo_sem_base": None if base_cac else
+            f"{vendas} venda(s) nesta semana e {vendas_prev} na anterior — "
+            f"abaixo do mínimo de {MIN_VENDAS_SEMANA} para ler CAC semanal",
+        "driver": _driver(sem, prev, canal),
+    }
+
+
+def comparativo_semanal(series):
+    """Última semana completa vs. a anterior, no portfólio e por partner×canal."""
+    partners = [p for p, c in series.items() if "total" in c and len(c["total"]) >= 2]
+    if not partners:
+        return None
+
+    ws = series[partners[0]]["total"][-1]["ws"]
+    ws_prev = series[partners[0]]["total"][-2]["ws"]
+
+    tot = {"liquido": 0, "vendas": 0, "leads": 0}
+    tot_prev = {"liquido": 0, "vendas": 0, "leads": 0}
+    atual, anterior = {}, {}
+    for p in partners:
+        a, b = series[p]["total"][-1], series[p]["total"][-2]
+        atual[p], anterior[p] = a, b
+        for k in tot:
+            tot[k] += a[k]
+            tot_prev[k] += b[k]
+
+    cac_now = _ratio(tot["liquido"], tot["vendas"])
+    cac_prev = _ratio(tot_prev["liquido"], tot_prev["vendas"])
+
+    # contribuição por contrafactual: recalcula o CAC do portfólio mantendo ESTE
+    # partner na semana anterior. A diferença é o efeito dele — exato, e responde
+    # "quem puxou" sem precisar de rateio arbitrário.
+    contrib = []
+    for p in partners:
+        liq = tot["liquido"] - atual[p]["liquido"] + anterior[p]["liquido"]
+        ven = tot["vendas"] - atual[p]["vendas"] + anterior[p]["vendas"]
+        cac_cf = _ratio(liq, ven)
+        contrib.append({
+            "partner": p,
+            "efeito_no_cac_portfolio": round(cac_now - cac_cf, 2)
+                                        if (cac_now is not None and cac_cf is not None) else None,
+            "delta_vendas": atual[p]["vendas"] - anterior[p]["vendas"],
+            "delta_liquido": atual[p]["liquido"] - anterior[p]["liquido"],
+        })
+    contrib.sort(key=lambda c: abs(c["efeito_no_cac_portfolio"] or 0), reverse=True)
+
+    por_partner = {}
+    for p in partners:
+        entrada = {"conta": _bloco_semana(atual[p], anterior[p], "total")}
+        for canal in ("google", "meta"):
+            serie = series[p].get(canal)
+            if serie and len(serie) >= 2:
+                entrada[canal] = _bloco_semana(serie[-1], serie[-2], canal)
+        por_partner[p] = entrada
+
+    return {
+        "semana": ws, "semana_anterior": ws_prev,
+        "portfolio": {
+            "cac": cac_now, "cac_anterior": cac_prev,
+            "cac_delta_pct": _delta_pct(cac_now, cac_prev, exige_positivo=True),
+            "leads": tot["leads"], "leads_anterior": tot_prev["leads"],
+            "vendas": tot["vendas"], "vendas_anterior": tot_prev["vendas"],
+            "liquido": tot["liquido"], "liquido_anterior": tot_prev["liquido"],
+            "contribuicao_por_partner": contrib,
+        },
+        "por_partner": por_partner,
     }
 
 
@@ -624,8 +831,16 @@ Cashback: quando o lead gerado pela campanha de um partner fecha com OUTRO
 provedor (CEP fora da cobertura do anunciante), o anunciante recebe cashback de
 reinvestimento.
 - investimento_liquido = bruto - cashback. CPL e CAC já vêm sobre o líquido.
-- Cashback subindo NÃO é dinheiro de volta: é a campanha comprando demanda fora
-  da área atendida. É sinal de segmentação geográfica desalinhada.
+- Cashback alto NÃO é problema por si só. Ele mede COBERTURA, não desperdício:
+  diz que existe demanda em CEPs onde o parceiro não atende. Se o CPL está na
+  meta e o volume de leads é razoável, a campanha está saudável e o cashback é
+  só o retrato da área atendida — não abra o parecer por ele e não recomende
+  apertar o raio de segmentação.
+- Cashback vira problema quando vem ACOMPANHADO de CPL ruim ou volume baixo de
+  leads: aí a verba está comprando demanda que não converte pro anunciante.
+- Quando o cashback é alto e o resto está saudável, a recomendação certa é
+  revisar a ÁREA DE COBERTURA do parceiro (avaliar expandir onde há demanda),
+  não cortar segmentação.
 - Atribuição de lead e venda é SEMPRE ao partner anunciante, nunca ao provedor
   que recebeu o lead.
 
@@ -679,11 +894,11 @@ Ordem de investigação, por partner:
 4. Pré-clique (ctr_pct, cpc_estimado vs pares) quando o gargalo não for de meio
    de funil. Desvio de 30% ou mais vs pares precisa aparecer no diagnóstico.
 
-5. Cashback quando pct_cashback subiu vs a janela anterior. Antes de recomendar
-   aperto geográfico, verifique se zip_search>redirect (meta) ou
-   clickoff>redirect (google) também piorou. Se o cashback subiu e essas taxas
-   estão estáveis, a causa provável é mudança no mix de demanda, não segmentação
-   — apertar o raio corta volume sem ganho.
+5. Cashback: só entra no diagnóstico se o CPL estiver acima da meta OU o volume
+   de leads estiver baixo. Cashback alto com CPL na meta e volume razoável é
+   COBERTURA, não desperdício — nesse caso, se citar, é como oportunidade de
+   revisar a área atendida, nunca como problema de campanha, e nunca como
+   abertura do parecer.
 
 6. Taxa redirect>leads fraca ou taxa lead>venda fraca tem DUAS causas possíveis,
    e você precisa escolher com evidência:
@@ -713,6 +928,11 @@ Padrões por etapa:
 - Todo número que você citar em qualquer campo tem que estar também em
   evidencias_citadas, com metrica, valor e janela exatamente como aparecem no
   payload. Número fora dessa lista é rejeitado na validação automática.
+- Essa lista é o TETO de especificidade da redação: a etapa seguinte só pode usar
+  número que esteja aqui. Declare TODO número relevante do partner, não só os que
+  você citou — o CAC e o CPL da semana e da anterior, o delta, o número do driver,
+  a taxa da etapa que moveu. Menos de 6 evidências num partner com base é sinal
+  de que você deixou a redação sem material.
 - Não calcule nada. Taxas, variações, CTR, CPC e tendências já vêm prontas. Se um
   número que você quer citar não existe no payload, ele não existe — reformule o
   diagnóstico no nível que os dados permitem.
@@ -783,7 +1003,7 @@ STAGE1_SCHEMA = {
                 "type": "object",
                 "required": ["partner", "status_geral", "eixo_principal", "canal_critico",
                              "diagnostico", "cadeia_causal", "acao_semana", "confianca",
-                             "evidencias_citadas", "risco_churn"],
+                             "evidencias_citadas", "risco_churn", "movimento_semanal"],
                 "properties": {
                     "partner": {"type": "string"},
                     "status_geral": {"type": "string",
@@ -794,14 +1014,40 @@ STAGE1_SCHEMA = {
                                                 "rastreamento", "ramp", "saudavel"]},
                     "canal_critico": {"type": "string",
                                       "enum": ["google", "meta", "ambos", "nenhum"]},
-                    "diagnostico": {"type": "string", "description": "até 400 caracteres"},
-                    "cadeia_causal": {"type": "string", "description": "até 300 caracteres"},
-                    "hipotese": {"type": "string", "description": "até 250 caracteres"},
-                    "como_validar": {"type": "string", "description": "até 200 caracteres"},
-                    "acao_semana": {"type": "string", "description": "até 250 caracteres"},
+                    # "até N caracteres" fazia o modelo mirar ~50% do teto (medido
+                    # no run de 26/07). Descrição agora pede o CONTEÚDO esperado;
+                    # o tamanho vem de ter o que dizer, não de um alvo numérico.
+                    "diagnostico": {"type": "string", "description":
+                        "O que está acontecendo com a conta ESTA semana. Cobrir: o "
+                        "movimento de CAC e CPL vs a semana anterior (ou dizer que "
+                        "não há base), em qual canal, e o número que sustenta cada "
+                        "afirmação. 3 a 5 frases densas, 400-700 caracteres."},
+                    "cadeia_causal": {"type": "string", "description":
+                        "A cadeia completa: métrica de topo -> etapa do funil que "
+                        "moveu -> efeito em CPL/CAC. Use o driver.principal do "
+                        "comparativo. 300-500 caracteres."},
+                    "hipotese": {"type": "string", "description":
+                        "Causa raiz provável, com o mecanismo — não só o rótulo. "
+                        "Obrigatório quando confianca for alta ou media. 200-350 "
+                        "caracteres."},
+                    "como_validar": {"type": "string", "description":
+                        "O que olhar para confirmar ou derrubar a hipótese, e em "
+                        "qual prazo. Obrigatório quando houver hipótese. 150-300 "
+                        "caracteres."},
+                    "acao_semana": {"type": "string", "description":
+                        "O que fazer, específico o bastante para alguém executar "
+                        "sem perguntar nada. 200-350 caracteres."},
                     "confianca": {"type": "string", "enum": ["alta", "media", "baixa"]},
                     "risco_churn": {"type": "boolean"},
-                    "mudou_vs_semana_anterior": {"type": "string", "description": "até 200 caracteres"},
+                    "mudou_vs_semana_anterior": {"type": "string", "description":
+                        "Leitura de continuidade vs o diagnóstico da semana passada: "
+                        "a ação foi executada e respondeu, foi executada e não "
+                        "respondeu (hipótese errada), não parece ter sido executada, "
+                        "ou o problema mudou de eixo."},
+                    "movimento_semanal": {"type": "string", "description":
+                        "Uma frase: CAC e CPL subiram ou caíram vs a semana anterior, "
+                        "em qual canal, e o que puxou. Se não houver base, dizer isso "
+                        "explicitamente em vez de omitir."},
                     "evidencias_citadas": {
                         "type": "array",
                         "items": {
@@ -900,8 +1146,21 @@ Não escreva o resumo antes dos pareceres.
 Um parecer por partner, na ordem de prioridade que vier no JSON. Nunca omita um
 partner.
 
-3 a 5 frases. Todo parecer cobre: situação, o que explica, e o que fazer esta
-semana. Hipótese e forma de validar entram quando existirem no diagnóstico.
+4 a 7 frases. Todo parecer cobre, obrigatoriamente:
+
+1. O MOVIMENTO DA SEMANA — CAC e CPL subiram ou caíram vs a semana anterior, e em
+   qual canal. Use `movimento_semanal`. Se o diagnóstico disser que não há base
+   para leitura semanal, diga isso em uma frase e siga para a janela de 30d.
+2. O QUE EXPLICA — a cadeia causal, terminando na alavanca concreta que moveu
+   (taxa de conversão em qual etapa, CPC, ou volume de investimento).
+3. A HIPÓTESE, quando existir no diagnóstico. Não é opcional: é a parte que o
+   dashboard não faz. Escreva o mecanismo, não o rótulo.
+4. COMO VALIDAR, quando existir. Uma frase.
+5. A AÇÃO da semana.
+
+Os campos 3 e 4 vinham sendo descartados na redação — o diagnóstico produzia
+hipótese e forma de validar e o parecer publicava sem eles. Se estão no JSON,
+entram no texto.
 
 Os campos cobertos são fixos — a ênfase e a ordem são livres. Abra pela parte
 mais forte da história daquela conta, não por um template. Uma conta com degrau na
@@ -917,8 +1176,14 @@ verificar. Não force análise.
 </pareceres>
 
 <leitura_portfolio>
-Um parágrafo curto. Onde o MP Agência ganha e perde dinheiro hoje, qual conta
-exige ação urgente e por quê, e a decisão mais importante da semana.
+Comece pelo movimento da carteira, no formato que o time pediu: o CAC geral desta
+semana vs a anterior, em %, e QUAIS provedores mais contribuíram para o
+movimento. Use `portfolio.contribuicao_por_partner`, que já vem ordenado por
+impacto e diz quanto cada um empurrou o CAC em reais. Cite os 2 ou 3 primeiros
+pela direção do efeito — quem puxou pra cima e quem segurou.
+
+Depois: onde o MP Agência ganha e perde dinheiro hoje, qual conta exige ação
+urgente e por quê, e a decisão mais importante da semana.
 
 Escrito para o CEO: sem jargão de etapa de funil, sem nome de métrica de
 plataforma. Se houver padrão de portfólio — várias contas com o mesmo problema ao
@@ -1114,6 +1379,20 @@ def validar(triagem, diag, blocos):
     for a in diag.get("acoes_priorizadas", []):
         if a.get("confianca") == "baixa":
             fatais.append(f"ação priorizada com confiança baixa: {a.get('partner')}")
+
+    # densidade: os dois sintomas medidos no run de 26/07 (pareceres rasos)
+    com_base = {k for k, v in triagem["por_partner"].items()
+                if v["status_geral"] in ("ok", "atencao", "alarme")}
+    magros = [p["partner"] for p in diag.get("partners", [])
+              if p.get("partner") in com_base and len(p.get("evidencias_citadas", [])) < 6]
+    if magros:
+        avisos.append("poucas evidências declaradas (teto da especificidade da prosa): "
+                      + ", ".join(magros))
+    sem_hip = [p["partner"] for p in diag.get("partners", [])
+               if p.get("partner") in com_base
+               and p.get("confianca") in ("alta", "media") and not p.get("hipotese")]
+    if sem_hip:
+        avisos.append("confiança alta/média sem hipótese: " + ", ".join(sem_hip))
 
     churn_tri = {k for k, v in triagem["por_partner"].items() if v["risco_churn"]}
     churn_diag = {p["partner"] for p in diag.get("partners", []) if p.get("risco_churn")}
