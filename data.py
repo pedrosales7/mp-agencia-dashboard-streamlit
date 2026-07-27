@@ -205,13 +205,15 @@ def funnel_medians(df, step_keys, min_cliques):
     return meds
 
 
-def compute_totals(d_ini, d_fim, canal_filter):
+def compute_totals(d_ini, d_fim, canal_filter, partners=None):
     parts = []
     if not canal_filter or canal_filter == "google":
         parts.append(_daily_snapshot[(_daily_snapshot["canal"] == "google") & _window_mask(_daily_snapshot, d_ini, d_fim)])
     if not canal_filter or canal_filter == "meta":
         parts.append(_daily_snapshot[(_daily_snapshot["canal"] == "meta") & _window_mask(_daily_snapshot, d_ini, d_fim)])
     combined = pd.concat(parts) if parts else _daily_snapshot.iloc[0:0]
+    if partners:
+        combined = combined[combined["id_mp"].isin(partners)]
     bruto, cashback = combined["bruto"].sum(), combined["cashback"].sum()
     leads, vendas = combined["leads"].sum(), combined["vendas"].sum()
     liquido = bruto - cashback

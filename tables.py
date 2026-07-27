@@ -45,8 +45,13 @@ def _delta_pp(curr, prev, semantic):
     return f'<span class="cell-delta {cls}">{arrow} {abs(diff):.1f}pp</span>'
 
 
-def render_funnel_table(df, step_keys, step_labels, min_cliques, prev_df=None, compare=False):
-    meds = funnel_medians(df, step_keys, min_cliques)
+def render_funnel_table(df, step_keys, step_labels, min_cliques, prev_df=None, compare=False, meds_source_df=None):
+    """meds_source_df: df usado só pra calcular a mediana/peer-group (outlier
+    bad/good). Por padrão é o próprio df exibido; quando o filtro de Partner
+    do topo restringe as linhas mostradas, passamos aqui o df completo (todos
+    os partners da conta), pra manter a mediana estável em vez de comparar o
+    partner selecionado com ele mesmo."""
+    meds = funnel_medians(meds_source_df if meds_source_df is not None else df, step_keys, min_cliques)
     head = ["Partner", "Bruto", "Cashback", "Líquido", "CPC", "Cliques", *step_labels,
             "CPL líq.", "CAC líq.", "Cliques→Venda"]
     # data-sort carrega o valor CRU: a célula mostra "R$ 2.780" e "84,8%", que
@@ -231,14 +236,17 @@ def render_progressao_table(df):
 
 
 def _taxas_delta(cur, prev):
+    """Mesma convenção visual (seta + 'pp') de _delta_pp, pra não ter um
+    terceiro estilo de delta na página."""
     if cur is None or prev is None:
         return '<span class="cell-delta flat">—</span>'
     diff = (cur - prev) * 100
     if abs(diff) < 0.05:
-        return '<span class="cell-delta flat">0,0 pp</span>'
-    cls = "up" if diff > 0 else "down"
-    sign = "+" if diff > 0 else "−"
-    return f'<span class="cell-delta {cls}">{sign}{abs(diff):.1f} pp</span>'
+        return '<span class="cell-delta flat">· 0,0pp</span>'
+    is_up = diff > 0
+    arrow = "▲" if is_up else "▼"
+    cls = "up" if is_up else "down"
+    return f'<span class="cell-delta {cls}">{arrow} {abs(diff):.1f}pp</span>'
 
 
 def render_taxas_block(df, stages, gran_label):

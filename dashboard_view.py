@@ -24,9 +24,9 @@ def render():
     def section_title(inner_html, tip_md):
         """Título de seção + popover "i" com a metodologia/fórmula/gotchas,
     equivalente ao .tip-content do dashboard HTML."""
-        c1, c2 = st.columns([30, 1])
+        c1, c2 = st.columns([30, 1], vertical_alignment="center")
         with c1:
-            st.markdown(f'<h2 style="font-size:18px;margin-bottom:0;">{inner_html}</h2>', unsafe_allow_html=True)
+            st.markdown(f'<h2 class="section-title">{inner_html}</h2>', unsafe_allow_html=True)
         with c2:
             with st.popover("ℹ️", use_container_width=True):
                 st.markdown(tip_md)
@@ -44,23 +44,6 @@ def render():
     else:
         human_age = f"{int(age_h // 24)}d atrás"
 
-    st.markdown(
-        f'<h1 style="font-size:26px;font-weight:700;margin-bottom:2px;">'
-    f'MP Agência — Funil Ads-to-Sale'
-    f'<span class="snap-badge {badge_cls}">snapshot {human_age} (até {snap["label"]})</span></h1>',
-        unsafe_allow_html=True,
-    )
-    st.caption(
-        "Atribuição pelo anunciante. Investimento via `performance_partner_mp_agency`; "
-    "eventos via `comparison.*` + `whatsapp_assistant.*`; leads/vendas via `checkout.lead_detail`. "
-    "CPL/CAC sobre líquido."
-    )
-
-    # ------------------------------------------------------------------
-    # Filtros -- estado inicial restaurado da URL (st.query_params), reescrito
-    # a cada rerun. Permite bookmark/compartilhar link com filtro aplicado
-    # (equivalente ao localStorage do HTML, mas funciona entre pessoas/dispositivos).
-    # ------------------------------------------------------------------
     qp = st.query_params
     month_keys = data.available_month_keys()
     month_options = ["—"] + [data.month_label(mk) for mk in month_keys]
@@ -84,10 +67,30 @@ def render():
         except ValueError:
             custom_default = ()
 
-    with st.container(border=True):
+    # ------------------------------------------------------------------
+    # Cabeçalho + filtros num único card -- antes o título flutuava sem
+    # borda acima do card de filtros; agora é um bloco visual só, com um
+    # divisor interno. Filtros: estado inicial restaurado da URL
+    # (st.query_params), reescrito a cada rerun. Permite bookmark/compartilhar
+    # link com filtro aplicado (equivalente ao localStorage do HTML, mas
+    # funciona entre pessoas/dispositivos).
+    # ------------------------------------------------------------------
+    with st.container(border=True, key="header_card"):
+        st.markdown(
+            f'<h1 class="dash-h1">MP Agência — Funil Ads-to-Sale'
+            f'<span class="snap-badge {badge_cls}">snapshot {human_age} (até {snap["label"]})</span></h1>',
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Atribuição pelo anunciante. Investimento via `performance_partner_mp_agency`; "
+        "eventos via `comparison.*` + `whatsapp_assistant.*`; leads/vendas via `checkout.lead_detail`. "
+        "CPL/CAC sobre líquido."
+        )
+        st.markdown('<hr class="header-divider">', unsafe_allow_html=True)
+
         f1, f2, f3, f4 = st.columns([3.2, 1.4, 2.2, 1.4])
         with f1:
-            st.caption("PERÍODO")
+            st.markdown('<div class="filter-label">PERÍODO</div>', unsafe_allow_html=True)
             p1, p2 = st.columns([1.6, 1], gap="small")
             with p1:
                 period = st.segmented_control("Período", ["7d", "30d", "90d"], default=period_qp,
@@ -107,16 +110,16 @@ def render():
                         help="Selecione data inicial e final — sobrepõe Período/Mês quando preenchido.",
                     )
         with f2:
-            st.caption("CANAL")
+            st.markdown('<div class="filter-label">CANAL</div>', unsafe_allow_html=True)
             canal_label = st.segmented_control("Canal", ["Todos", "Google", "Meta"], default=canal_qp,
                                                 label_visibility="collapsed")
             canal_filter = None if canal_label in (None, "Todos") else canal_label.lower()
         with f3:
-            st.caption("PARTNER")
+            st.markdown('<div class="filter-label">PARTNER</div>', unsafe_allow_html=True)
             selected_partners = st.multiselect("Partner", data.PARTNERS, default=partner_qp, label_visibility="collapsed",
                                                 placeholder="Todos")
         with f4:
-            st.caption("COMPARAR")
+            st.markdown('<div class="filter-label">COMPARAR</div>', unsafe_allow_html=True)
             compare = st.toggle("Δ vs período anterior", value=compare_qp)
 
     custom_invalid = len(custom_range) == 2 and custom_range[0] > custom_range[1]
@@ -154,9 +157,9 @@ def render():
     # ------------------------------------------------------------------
     # KPIs
     # ------------------------------------------------------------------
-    totals = data.compute_totals(d_ini, d_fim, canal_filter)
+    totals = data.compute_totals(d_ini, d_fim, canal_filter, selected_partners)
     prev_d_ini, prev_d_fim = data.previous_window(d_ini, d_fim)
-    prev = data.compute_totals(prev_d_ini, prev_d_fim, canal_filter)
+    prev = data.compute_totals(prev_d_ini, prev_d_fim, canal_filter, selected_partners)
 
 
     def _inline_partners(key_prefix):
@@ -182,44 +185,53 @@ def render():
         return f"{pct:+.1f}%", ("inverse" if invert else "normal")
 
 
-    k1, k2, k3, k4, k5, k6, k7 = st.columns(7)
+    with st.container(border=True, key="kpi_strip"):
+        k1, k2, k3, k4, k5, k6, k7 = st.columns(7)
 
-    with k1.container(border=True):
-        d, c = _delta(totals["liquido"], prev["liquido"])
-        st.metric("Investimento líquido", data.fmt_brl(totals["liquido"]), d, delta_color="off",
-                  help="Bruto − Cashback. Fonte: performance_partner_mp_agency.")
+        with k1:
+            d, c = _delta(totals["liquido"], prev["liquido"])
+            st.metric("Investimento líquido", data.fmt_brl(totals["liquido"]), d, delta_color="off",
+                      help="Bruto − Cashback. Fonte: performance_partner_mp_agency.")
+            st.caption(" ")
 
-    with k2.container(border=True):
-        d, c = _delta(totals["cashback"], prev["cashback"])
-        st.metric("Cashback", data.fmt_brl(totals["cashback"]), d, delta_color="off",
-                  help="Parte do investimento bruto que não fica com o anunciante (lead/redirect caiu "
-                   "fora da cobertura dele e voltou pra Melhor Plano). Líquido = Bruto − Cashback.")
-        st.caption(f"{totals['cashback'] / totals['bruto'] * 100:.0f}% do bruto" if totals["bruto"] else " ")
+        with k2:
+            d, c = _delta(totals["cashback"], prev["cashback"])
+            st.metric("Cashback", data.fmt_brl(totals["cashback"]), d, delta_color="off",
+                      help="Parte do investimento bruto que não fica com o anunciante (lead/redirect caiu "
+                       "fora da cobertura dele e voltou pra Melhor Plano). Líquido = Bruto − Cashback.")
+            st.caption(f"{totals['cashback'] / totals['bruto'] * 100:.0f}% do bruto" if totals["bruto"] else " ")
 
-    with k3.container(border=True):
-        d, c = _delta(totals["leads"], prev["leads"])
-        st.metric("Leads produtivos", data.fmt_num(totals["leads"]), d, delta_color=c,
-                  help="source em google/whatsapp e lead_accepted=true.")
+        with k3:
+            d, c = _delta(totals["leads"], prev["leads"])
+            st.metric("Leads produtivos", data.fmt_num(totals["leads"]), d, delta_color=c,
+                      help="source em google/whatsapp e lead_accepted=true.")
+            st.caption(" ")
 
-    with k4.container(border=True):
-        d, c = _delta(totals["vendas"], prev["vendas"])
-        st.metric("Vendas", data.fmt_num(totals["vendas"]), d, delta_color=c,
-                  help="current_situation IN (sold, installed, scheduled).")
+        with k4:
+            d, c = _delta(totals["vendas"], prev["vendas"])
+            st.metric("Vendas", data.fmt_num(totals["vendas"]), d, delta_color=c,
+                      help="current_situation IN (sold, installed, scheduled).")
+            st.caption(" ")
 
-    with k5.container(border=True):
-        d, c = _delta(totals["cpl"], prev["cpl"], invert=True)
-        st.metric("CPL líq.", data.fmt_brl(totals["cpl"], 2), d, delta_color=c,
-                  help="Investimento líquido / Leads produtivos.")
+        with k5:
+            d, c = _delta(totals["cpl"], prev["cpl"], invert=True)
+            st.metric("CPL líq.", data.fmt_brl(totals["cpl"], 2), d, delta_color=c,
+                      help="Investimento líquido / Leads produtivos.")
+            st.caption(" ")
 
-    with k6.container(border=True):
-        d, c = _delta(totals["cac"], prev["cac"], invert=True)
-        st.metric("CAC líq.", data.fmt_brl(totals["cac"], 2), d, delta_color=c,
-                  help="Investimento líquido / Vendas.")
+        with k6:
+            d, c = _delta(totals["cac"], prev["cac"], invert=True)
+            st.metric("CAC líq.", data.fmt_brl(totals["cac"], 2), d, delta_color=c,
+                      help="Investimento líquido / Vendas.")
+            st.caption(" ")
 
-    with k7.container(border=True):
-        d, c = _delta(totals["rate"], prev["rate"])
-        st.metric("Lead → Venda", data.fmt_pct(totals["rate"]), d, delta_color=c,
-                  help="Vendas / Leads produtivos.")
+        with k7:
+            d, c = _delta(totals["rate"], prev["rate"])
+            st.metric("Lead → Venda", data.fmt_pct(totals["rate"]), d, delta_color=c,
+                      help="Vendas / Leads produtivos.")
+            st.caption(" ")
+
+    st.caption("ⓘ Passe o mouse sobre o ícone de ajuda em cada indicador pra ver a fórmula/fonte.")
 
     st.divider()
 
@@ -284,40 +296,52 @@ Só conta partners com Cliques ≥ 100 na mediana (Meta tem mais volume bruto de
 
     if not canal_filter or canal_filter == "google":
         section_title('Funil completo Google <span class="canal-tag google">google</span>', TIP_FUNIL_GOOGLE)
-        g_df = data.build_google_df(d_ini, d_fim)
+        g_df_full = data.build_google_df(d_ini, d_fim)
         step_keys, step_labels, min_cliques = data.funnel_step_config("google")
+        g_df = g_df_full[g_df_full["id_mp"].isin(selected_partners)] if selected_partners else g_df_full
         g_df = g_df.sort_values("cliques", ascending=False, na_position="last")
-        components.html(
-            tables.sortable_doc(
-                tables.render_funnel_table(g_df, step_keys, step_labels, min_cliques, prev_google_df, compare),
-                style.CSS),
-            height=tables.sortable_table_height(len(g_df), compare=compare), scrolling=True)
-        st.markdown(
-            '<div class="legend-row"><span class="sw"><i class="bad"></i></span> '
-        'pior que a mediana (&lt;50% / CAC &gt;200%) · <span class="sw"><i class="good"></i></span> '
-        'melhor que a mediana · só partners com Cliques ≥ 30 entram na comparação. '
-        'Clique no cabeçalho pra ordenar.</div>',
-            unsafe_allow_html=True,
-        )
+        if g_df["cliques"].sum() == 0:
+            st.markdown('<div class="empty-hint">Sem cliques no Google pro período/partners selecionados.</div>',
+                        unsafe_allow_html=True)
+        else:
+            components.html(
+                tables.sortable_doc(
+                    tables.render_funnel_table(g_df, step_keys, step_labels, min_cliques, prev_google_df, compare,
+                                                meds_source_df=g_df_full),
+                    style.CSS),
+                height=tables.sortable_table_height(len(g_df), compare=compare), scrolling=True)
+            st.markdown(
+                '<div class="legend-row"><span class="sw"><i class="bad"></i></span> '
+            'pior que a mediana (&lt;50% / CAC &gt;200%) · <span class="sw"><i class="good"></i></span> '
+            'melhor que a mediana · só partners com Cliques ≥ 30 entram na comparação. '
+            'Clique no cabeçalho pra ordenar.</div>',
+                unsafe_allow_html=True,
+            )
         st.write("")
 
     if not canal_filter or canal_filter == "meta":
         section_title('Funil completo Meta WhatsApp <span class="canal-tag meta">meta</span>', TIP_FUNIL_META)
-        m_df = data.build_meta_df(d_ini, d_fim)
+        m_df_full = data.build_meta_df(d_ini, d_fim)
         step_keys, step_labels, min_cliques = data.funnel_step_config("meta")
+        m_df = m_df_full[m_df_full["id_mp"].isin(selected_partners)] if selected_partners else m_df_full
         m_df = m_df.sort_values("cliques", ascending=False, na_position="last")
-        components.html(
-            tables.sortable_doc(
-                tables.render_funnel_table(m_df, step_keys, step_labels, min_cliques, prev_meta_df, compare),
-                style.CSS),
-            height=tables.sortable_table_height(len(m_df), compare=compare), scrolling=True)
-        st.markdown(
-            '<div class="legend-row"><span class="sw"><i class="bad"></i></span> '
-        'pior que a mediana · <span class="sw"><i class="good"></i></span> melhor · '
-        'só partners com Cliques ≥ 100 entram (Meta tem mais volume bruto de cliques). '
-        'Clique no cabeçalho pra ordenar.</div>',
-            unsafe_allow_html=True,
-        )
+        if m_df["cliques"].sum() == 0:
+            st.markdown('<div class="empty-hint">Sem cliques no Meta pro período/partners selecionados.</div>',
+                        unsafe_allow_html=True)
+        else:
+            components.html(
+                tables.sortable_doc(
+                    tables.render_funnel_table(m_df, step_keys, step_labels, min_cliques, prev_meta_df, compare,
+                                                meds_source_df=m_df_full),
+                    style.CSS),
+                height=tables.sortable_table_height(len(m_df), compare=compare), scrolling=True)
+            st.markdown(
+                '<div class="legend-row"><span class="sw"><i class="bad"></i></span> '
+            'pior que a mediana · <span class="sw"><i class="good"></i></span> melhor · '
+            'só partners com Cliques ≥ 100 entram (Meta tem mais volume bruto de cliques). '
+            'Clique no cabeçalho pra ordenar.</div>',
+                unsafe_allow_html=True,
+            )
         st.write("")
 
     st.divider()
@@ -344,11 +368,16 @@ em período customizado usa `partner_id_partner` direto — os dois métodos pod
 """
 
     section_title("Análise de Cobertura e Assertividade", TIP_COBERTURA)
-    cov_df = data.build_coverage_df(d_ini, d_fim, canal_filter)
-    st.markdown(tables.render_coverage_table(cov_df), unsafe_allow_html=True)
-    st.caption("Uma linha por partner, Google e Meta lado a lado (cada canal tem sua própria base — "
-           "Clickoff pro Google, Chat start pro Meta). % Cashback: alto = lead caiu fora da cobertura "
-           "do anunciante. % Assertividade = Leads c/ cobertura / Leads totais.")
+    cov_df_full = data.build_coverage_df(d_ini, d_fim, canal_filter)
+    cov_df = cov_df_full[cov_df_full["id_mp"].isin(selected_partners)] if selected_partners else cov_df_full
+    if cov_df["g_bruto"].fillna(0).sum() + cov_df["m_bruto"].fillna(0).sum() == 0:
+        st.markdown('<div class="empty-hint">Sem dados de cobertura pro período/partners selecionados.</div>',
+                    unsafe_allow_html=True)
+    else:
+        st.markdown(tables.render_coverage_table(cov_df), unsafe_allow_html=True)
+        st.caption("Uma linha por partner, Google e Meta lado a lado (cada canal tem sua própria base — "
+               "Clickoff pro Google, Chat start pro Meta). % Cashback: alto = lead caiu fora da cobertura "
+               "do anunciante. % Assertividade = Leads c/ cobertura / Leads totais.")
 
     st.divider()
 
@@ -387,10 +416,10 @@ Os dados são extraídos das mesmas fontes das outras seções (consistente com 
                     unsafe_allow_html=True)
     else:
         for id_mp in prog_partners:
-            st.markdown(f"**{id_mp}**")
-            prog_df = data.build_progressao_df(id_mp, "weekly" if prog_gran == "Semanal" else "monthly")
-            st.markdown(tables.render_progressao_table(prog_df), unsafe_allow_html=True)
-            st.write("")
+            with st.container(key=f"prog_block_{id_mp}"):
+                st.markdown(f"**{id_mp}**")
+                prog_df = data.build_progressao_df(id_mp, "weekly" if prog_gran == "Semanal" else "monthly")
+                st.markdown(tables.render_progressao_table(prog_df), unsafe_allow_html=True)
     st.caption("\\* Leads produtivos: `source` em google/whatsapp e `lead_accepted=true`.")
 
     st.divider()
@@ -429,13 +458,13 @@ pra não induzir a erro com base pequena.
         gran_key = "weekly" if taxas_gran == "Semanal" else "monthly"
         gran_label = "sem." if gran_key == "weekly" else "mês"
         for id_mp in taxas_partners:
-            st.markdown(f"**{id_mp}**")
-            taxas_df = data.build_taxas_df(id_mp, gran_key)
-            st.markdown('<div class="taxas-channel google"><h4>Google</h4></div>', unsafe_allow_html=True)
-            st.markdown(tables.render_taxas_block(taxas_df, data.STAGES_G, gran_label), unsafe_allow_html=True)
-            st.markdown('<div class="taxas-channel meta"><h4>Meta</h4></div>', unsafe_allow_html=True)
-            st.markdown(tables.render_taxas_block(taxas_df, data.STAGES_M, gran_label), unsafe_allow_html=True)
-            st.write("")
+            with st.container(key=f"taxas_block_{id_mp}"):
+                st.markdown(f"**{id_mp}**")
+                taxas_df = data.build_taxas_df(id_mp, gran_key)
+                st.markdown('<div class="taxas-channel google"><h4>Google</h4></div>', unsafe_allow_html=True)
+                st.markdown(tables.render_taxas_block(taxas_df, data.STAGES_G, gran_label), unsafe_allow_html=True)
+                st.markdown('<div class="taxas-channel meta"><h4>Meta</h4></div>', unsafe_allow_html=True)
+                st.markdown(tables.render_taxas_block(taxas_df, data.STAGES_M, gran_label), unsafe_allow_html=True)
     st.caption("Cor do delta: verde = taxa subiu, vermelho = caiu. "
            "\"—\" quando o denominador é menor que 5.")
 
@@ -466,19 +495,24 @@ verde no oposto. Só partners com Leads ≥ 3 entram na comparação.
 """
 
     section_title("Detalhamento investimento × leads × vendas", TIP_DETALHAMENTO)
-    detail_df = data.build_detail_df(d_ini, d_fim, canal_filter)
-    detail_meds = data.detail_medians(detail_df)
+    detail_df_full = data.build_detail_df(d_ini, d_fim, canal_filter)
+    detail_meds = data.detail_medians(detail_df_full)
+    detail_df = detail_df_full[detail_df_full["id_mp"].isin(selected_partners)] if selected_partners else detail_df_full
     detail_df = detail_df.sort_values("liquido", ascending=False, na_position="last")
     prev_detail_df = data.build_detail_df(prev_d_ini, prev_d_fim, canal_filter) if compare else None
-    components.html(
-        tables.sortable_doc(tables.render_detail_table(detail_df, detail_meds, prev_detail_df, compare), style.CSS),
-        height=tables.sortable_table_height(len(detail_df), tables.ROW_H_PLAIN, compare), scrolling=True)
-    st.markdown(
-        '<div class="legend-row"><span class="sw"><i class="bad"></i></span> '
-    'pior que a mediana · <span class="sw"><i class="good"></i></span> melhor que a mediana · '
-    '<span class="sw"><i style="background:var(--warn)"></i></span> bruto &gt; 0 e leads = 0.</div>',
-        unsafe_allow_html=True,
-    )
+    if detail_df["bruto"].sum() == 0:
+        st.markdown('<div class="empty-hint">Sem investimento no período/partners selecionados.</div>',
+                    unsafe_allow_html=True)
+    else:
+        components.html(
+            tables.sortable_doc(tables.render_detail_table(detail_df, detail_meds, prev_detail_df, compare), style.CSS),
+            height=tables.sortable_table_height(len(detail_df), tables.ROW_H_PLAIN, compare), scrolling=True)
+        st.markdown(
+            '<div class="legend-row"><span class="sw"><i class="bad"></i></span> '
+        'pior que a mediana · <span class="sw"><i class="good"></i></span> melhor que a mediana · '
+        '<span class="sw"><i style="background:var(--warn)"></i></span> bruto &gt; 0 e leads = 0.</div>',
+            unsafe_allow_html=True,
+        )
 
     st.divider()
 
@@ -518,9 +552,12 @@ continua valendo.
         fig_credit.update_layout(
             height=320, margin=dict(l=10, r=10, t=10, b=10),
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="sans serif", color="#171a1a", size=12),
+            hoverlabel=dict(bgcolor="#ffffff", bordercolor="#dde2df", font_size=12, font_family="sans serif"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            xaxis=dict(showgrid=False, type="date", tickformat="%d/%m/%y"),
-            yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)", title="Crédito remanescente (R$)"),
+            xaxis=dict(showgrid=False, type="date", tickformat="%d/%m/%y", tickfont=dict(size=11, color="#666e6b")),
+            yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)", title="Crédito remanescente (R$)",
+                       tickfont=dict(size=11, color="#666e6b")),
         )
         st.plotly_chart(fig_credit, use_container_width=True)
     st.caption("Clique num item da legenda pra ocultar/exibir a linha do parceiro.")
@@ -551,11 +588,18 @@ continua valendo.
         return [(r["label"], data.taxa_value(r[metric["num_key"]], r[metric["den_key"]])) for _, r in df.iterrows()]
 
 
-    st.markdown(
-        '<h2 style="font-size:18px;">Evolução de métricas ao longo do tempo '
-    '<span style="font-size:11px;font-weight:400;color:var(--mut);border:1px solid var(--bd);'
-    'border-radius:4px;padding:1px 6px;">teste</span></h2>',
-        unsafe_allow_html=True,
+    TIP_EVOLUCAO = """
+**Seção experimental** — mesmos dados de Progressão/Taxas, plotados como série temporal
+pra facilitar comparar a trajetória de vários partners numa métrica só.
+
+Métricas combinadas (Lead→Venda, CPL, CAC) somam Google + Meta. Etapas do funil usam a mesma
+regra de base mínima da Evolução das taxas de conversão (denominador < 5 vira ponto vazio).
+"""
+    section_title(
+        'Evolução de métricas ao longo do tempo '
+        '<span style="font-size:11px;font-weight:400;color:var(--mut);border:1px solid var(--bd);'
+        'border-radius:4px;padding:1px 6px;">teste</span>',
+        TIP_EVOLUCAO,
     )
     tc1, tc2, tc3 = st.columns([2, 1, 2.4])
     with tc1:
@@ -586,11 +630,14 @@ continua valendo.
         fig.update_layout(
             height=360, margin=dict(l=10, r=10, t=10, b=10),
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="sans serif", color="#171a1a", size=12),
+            hoverlabel=dict(bgcolor="#ffffff", bordercolor="#dde2df", font_size=12, font_family="sans serif"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            xaxis=dict(showgrid=False),
+            xaxis=dict(showgrid=False, tickfont=dict(size=11, color="#666e6b")),
             yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)",
                        tickformat=".0%" if metric["unit"] == "pct" else None,
-                       rangemode="tozero" if metric["unit"] == "pct" else "normal"),
+                       rangemode="tozero" if metric["unit"] == "pct" else "normal",
+                       tickfont=dict(size=11, color="#666e6b")),
         )
         st.plotly_chart(fig, use_container_width=True)
     st.caption("Métricas combinadas (Lead→Venda, CPL, CAC) somam Google + Meta. Etapas do funil usam a mesma "
