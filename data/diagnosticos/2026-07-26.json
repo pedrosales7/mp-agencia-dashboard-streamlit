@@ -1,13 +1,241 @@
 {
  "partners": [
   {
+   "partner": "Ativa Telecom",
+   "status_geral": "ok",
+   "eixo_principal": "saudavel",
+   "canal_critico": "nenhum",
+   "diagnostico": "Conta saudavel com CAC de R$70.83. O Google (CAC R$95.20) possui gargalo em redirect>leads (12.3%), apontando friccao no formulario. O Meta gerou apenas 1 lead e esta sem base.",
+   "cadeia_causal": "O trafego do Google chega a landing page, mas a baixa taxa de conversao final (redirect>leads) indica que o formulario pode estar longo ou apresentando falhas, dificultando a captacao.",
+   "acao_semana": "Otimizar a landing page do Google, simplificando o formulario para reduzir a friccao e aumentar a conversao final.",
+   "confianca": "alta",
+   "evidencias_citadas": [
+    {
+     "metrica": "cac",
+     "valor": "70.83",
+     "janela": "30d",
+     "canal": "ambos"
+    },
+    {
+     "metrica": "cac",
+     "valor": "95.2",
+     "janela": "30d",
+     "canal": "google"
+    },
+    {
+     "metrica": "redirect>leads",
+     "valor": "12.3",
+     "janela": "30d",
+     "canal": "google"
+    },
+    {
+     "metrica": "leads",
+     "valor": "1",
+     "janela": "30d",
+     "canal": "meta"
+    }
+   ],
+   "risco_churn": false,
+   "movimento_semanal": "CAC nao tem base para leitura semanal devido a 4 vendas nesta semana e 1 na anterior.",
+   "como_validar": "Acompanhar se a taxa redirect>leads no Google apresenta crescimento nos proximos 7d.",
+   "hipotese": "Campos excessivos ou layout confuso no formulario da landing page estao causando abandono na ultima etapa do funil.",
+   "mudou_vs_semana_anterior": "a acao nao parece ter sido executada (indicador e padrao seguem identicos)"
+  },
+  {
+   "partner": "Direct",
+   "status_geral": "alarme",
+   "eixo_principal": "funil",
+   "canal_critico": "meta",
+   "diagnostico": "O CAC da conta esta em R$208.86, puxado pelo Meta (CAC R$406.20). No Meta, a CTR caiu gradualmente para 0.62% e o gargalo e cliques>chat_start (32.7%), indicando fadiga de criativo. O Google tem CAC de R$150.82 (alerta).",
+   "cadeia_causal": "A queda gradual da CTR no Meta sugere fadiga dos criativos atuais. Isso diminui o volume de entrada e piora a taxa de cliques para inicio de conversa, elevando drasticamente o custo por aquisicao.",
+   "acao_semana": "Rotacionar os criativos no Meta para combater a fadiga e melhorar a atratividade do CTA.",
+   "confianca": "alta",
+   "evidencias_citadas": [
+    {
+     "metrica": "cac",
+     "valor": "208.86",
+     "janela": "30d",
+     "canal": "ambos"
+    },
+    {
+     "metrica": "cac",
+     "valor": "406.2",
+     "janela": "30d",
+     "canal": "meta"
+    },
+    {
+     "metrica": "ctr_pct",
+     "valor": "0.62",
+     "janela": "30d",
+     "canal": "meta"
+    },
+    {
+     "metrica": "cliques>chat_start",
+     "valor": "32.7",
+     "janela": "30d",
+     "canal": "meta"
+    },
+    {
+     "metrica": "cac",
+     "valor": "150.82",
+     "janela": "30d",
+     "canal": "google"
+    }
+   ],
+   "risco_churn": false,
+   "movimento_semanal": "CAC semanal subiu 11.5% para R$258.50, puxado por queda na taxa lead>venda.",
+   "como_validar": "Acompanhar se a CTR e a taxa cliques>chat_start no Meta apresentam recuperacao nos proximos 7d apos a troca.",
+   "hipotese": "Os criativos do Meta esgotaram seu potencial com o publico atual, gerando desinteresse e cliques desqualificados.",
+   "mudou_vs_semana_anterior": "a acao nao parece ter sido executada (indicador e padrao seguem identicos)"
+  },
+  {
+   "partner": "Enove",
+   "status_geral": "alarme",
+   "eixo_principal": "funil",
+   "canal_critico": "google",
+   "diagnostico": "Risco de churn ativo: CAC de R$212.88 e leads no piso. Ocorreu uma queda em degrau nos cliques em 2026-07-06. No Google (CAC R$223.33), o gargalo e redirect>leads (13.9%). No Meta, o gargalo e cliques>chat_start (19.9%).",
+   "cadeia_causal": "A queda brusca de trafego reduziu o volume do topo de funil. O trafego que chega sofre com friccao no formulario (Google) e baixa atratividade no criativo/CTA (Meta), encarecendo o CAC.",
+   "acao_semana": "Investigar a queda de cliques em 06/07. Simplificar o formulario da landing page (Google) e testar novos criativos/CTAs no Meta.",
+   "confianca": "alta",
+   "evidencias_citadas": [
+    {
+     "metrica": "cac",
+     "valor": "212.88",
+     "janela": "30d",
+     "canal": "ambos"
+    },
+    {
+     "metrica": "cac",
+     "valor": "223.33",
+     "janela": "30d",
+     "canal": "google"
+    },
+    {
+     "metrica": "redirect>leads",
+     "valor": "13.9",
+     "janela": "30d",
+     "canal": "google"
+    },
+    {
+     "metrica": "cliques>chat_start",
+     "valor": "19.9",
+     "janela": "30d",
+     "canal": "meta"
+    }
+   ],
+   "risco_churn": true,
+   "movimento_semanal": "CAC semanal sem base (0 vendas nesta semana).",
+   "como_validar": "Monitorar se a taxa redirect>leads no Google e cliques>chat_start no Meta aumentam apos as implementacoes.",
+   "hipotese": "Friccao excessiva no formulario e criativos desgastados estao impedindo a conversao do trafego, que ja foi reduzido por uma mudanca em 06/07.",
+   "mudou_vs_semana_anterior": "a acao nao parece ter sido executada (indicador e padrao seguem identicos)"
+  },
+  {
+   "partner": "Interplus",
+   "status_geral": "sem_base",
+   "eixo_principal": "rastreamento",
+   "canal_critico": "nenhum",
+   "diagnostico": "A conta gerou apenas 2 leads em 30d, ficando sem base para analise de performance. Os cliques cairam 100% nas ultimas semanas, indicando que as campanhas pararam de rodar.",
+   "cadeia_causal": "A ausencia de trafego e leads recentes sugere que as campanhas foram pausadas, ficaram sem saldo ou sofreram reprovacao, interrompendo a entrega.",
+   "acao_semana": "Investigar o motivo da interrupcao da entrega das campanhas (saldo, reprovacao ou pausa manual).",
+   "confianca": "alta",
+   "evidencias_citadas": [
+    {
+     "metrica": "leads",
+     "valor": "2",
+     "janela": "30d",
+     "canal": "ambos"
+    }
+   ],
+   "risco_churn": false,
+   "movimento_semanal": "Sem base para leitura de CAC (0 vendas).",
+   "como_validar": "Verificar o status das campanhas nas plataformas e confirmar se a entrega foi retomada.",
+   "hipotese": "Problemas de faturamento ou reprovacao de anuncios paralisaram a veiculacao das campanhas.",
+   "mudou_vs_semana_anterior": "a acao nao parece ter sido executada (indicador e padrao seguem identicos)"
+  },
+  {
+   "partner": "Loga",
+   "status_geral": "ok",
+   "eixo_principal": "saudavel",
+   "canal_critico": "nenhum",
+   "diagnostico": "Conta com performance saudavel e CAC de R$108.83. O Google entrega CAC de R$98.71. No Meta (CAC R$137.41), o gargalo e zip_search>redirect (46.0%), indicando que parte dos usuarios nao tem cobertura.",
+   "cadeia_causal": "Apesar da boa performance geral, a taxa de zip_search>redirect no Meta mostra que ha espaco para otimizacao na segmentacao geografica, evitando cliques de regioes sem viabilidade.",
+   "acao_semana": "Manter a estrutura atual, mas revisar o raio de segmentacao no Meta para melhorar a taxa de viabilidade.",
+   "confianca": "alta",
+   "evidencias_citadas": [
+    {
+     "metrica": "cac",
+     "valor": "108.83",
+     "janela": "30d",
+     "canal": "ambos"
+    },
+    {
+     "metrica": "cac",
+     "valor": "98.71",
+     "janela": "30d",
+     "canal": "google"
+    },
+    {
+     "metrica": "cac",
+     "valor": "137.41",
+     "janela": "30d",
+     "canal": "meta"
+    },
+    {
+     "metrica": "zip_search>redirect",
+     "valor": "46.0",
+     "janela": "30d",
+     "canal": "meta"
+    }
+   ],
+   "risco_churn": false,
+   "movimento_semanal": "CAC semanal subiu 43.0% para R$151.62, puxado por queda na taxa lead>venda.",
+   "como_validar": "Observar se a taxa zip_search>redirect no Meta aumenta nos proximos 7d apos o ajuste de raio.",
+   "hipotese": "A segmentacao do Meta esta ligeiramente ampla, captando usuarios interessados, mas fora da area de cobertura.",
+   "mudou_vs_semana_anterior": "a acao nao parece ter sido executada (indicador e padrao seguem identicos)"
+  },
+  {
+   "partner": "The Fiber",
+   "status_geral": "alarme",
+   "eixo_principal": "funil",
+   "canal_critico": "google",
+   "diagnostico": "Ha risco de churn com CAC de R$273.73. O Google e o canal critico (CAC R$175.36) e sofreu uma queda brusca de cliques a partir de 2026-07-06. O gargalo do funil e sessoes>clickoff (44.0%), indicando oferta pouco competitiva.",
+   "cadeia_causal": "A queda em degrau nos cliques sugere que algo estrutural mudou na conta em 06/07. Alem disso, a baixa taxa de sessoes>clickoff aponta que a oferta nao esta retendo os usuarios, encarecendo o CAC.",
+   "acao_semana": "Investigar o historico de alteracoes para descobrir o que causou a queda de cliques em 2026-07-06 e revisar a competitividade da oferta na landing page.",
+   "confianca": "alta",
+   "evidencias_citadas": [
+    {
+     "metrica": "cac",
+     "valor": "273.73",
+     "janela": "30d",
+     "canal": "ambos"
+    },
+    {
+     "metrica": "cac",
+     "valor": "175.36",
+     "janela": "30d",
+     "canal": "google"
+    },
+    {
+     "metrica": "sessoes>clickoff",
+     "valor": "44.0",
+     "janela": "30d",
+     "canal": "google"
+    }
+   ],
+   "risco_churn": true,
+   "movimento_semanal": "CAC semanal subiu 15.8% para R$177.00, puxado por queda no CPC.",
+   "como_validar": "Verificar se a retomada do volume de cliques normaliza a geracao de leads e se ajustes na oferta melhoram a taxa sessoes>clickoff.",
+   "hipotese": "Uma alteracao em 06/07 cortou a entrega da campanha, e a oferta atual nao e atrativa o suficiente para converter o trafego restante.",
+   "mudou_vs_semana_anterior": "a acao nao parece ter sido executada (indicador e padrao seguem identicos)"
+  },
+  {
    "partner": "Ultranet",
    "status_geral": "alarme",
    "eixo_principal": "cobertura",
    "canal_critico": "google",
-   "diagnostico": "O CAC da conta está em R$462.67 (alarme). O Google apresenta CAC de R$243.0 e gargalo em clickoff>redirect (29.0%). O Meta tem CPL de R$109.83 e gargalo em zip_search>redirect (40.8%). O cashback da conta subiu para 26.4%, indicando compra de demanda fora da área atendida.",
-   "cadeia_causal": "Aumento do cashback aliado a baixas taxas de avanço nas etapas de viabilidade (clickoff>redirect no Google e zip_search>redirect no Meta) demonstram que a segmentação geográfica está desalinhada, atraindo público fora da cobertura.",
-   "acao_semana": "Apertar o raio de segmentação geográfica em ambos os canais para focar apenas nas áreas com viabilidade.",
+   "diagnostico": "O CAC da conta esta em R$462.67 (alarme). O Google apresenta CAC de R$243.00 e gargalo em clickoff>redirect (29.0%). O Meta tem CPL de R$109.83 e gargalo em zip_search>redirect (40.8%). O cashback da conta subiu para 26.4%, indicando compra de demanda fora da area atendida.",
+   "cadeia_causal": "Aumento do cashback aliado a baixas taxas de avanco nas etapas de viabilidade (clickoff>redirect no Google e zip_search>redirect no Meta) demonstram que a segmentacao geografica esta desalinhada, atraindo publico fora da cobertura.",
+   "acao_semana": "Apertar o raio de segmentacao geografica em ambos os canais para focar apenas nas areas com viabilidade.",
    "confianca": "alta",
    "evidencias_citadas": [
     {
@@ -48,134 +276,19 @@
     }
    ],
    "risco_churn": false,
-   "como_validar": "Acompanhar se as taxas de clickoff>redirect e zip_search>redirect aumentam e se o pct_cashback diminui nos próximos 7d.",
-   "hipotese": "A segmentação atual está ampla demais, englobando CEPs onde o provedor não tem viabilidade técnica."
-  },
-  {
-   "partner": "The Fiber",
-   "status_geral": "alarme",
-   "eixo_principal": "funil",
-   "canal_critico": "google",
-   "diagnostico": "Há risco de churn com CAC de R$273.73. O Google é o canal crítico (CAC R$175.36) e sofreu uma queda brusca de cliques a partir de 2026-07-06. O gargalo do funil é sessoes>clickoff (44.0%), indicando oferta pouco competitiva.",
-   "cadeia_causal": "A queda em degrau nos cliques sugere que algo estrutural mudou na conta em 06/07. Além disso, a baixa taxa de sessoes>clickoff aponta que a oferta não está retendo os usuários, encarecendo o CAC.",
-   "acao_semana": "Investigar o histórico de alterações para descobrir o que causou a queda de cliques em 2026-07-06 e revisar a competitividade da oferta na landing page.",
-   "confianca": "alta",
-   "evidencias_citadas": [
-    {
-     "metrica": "cac",
-     "valor": "273.73",
-     "janela": "30d",
-     "canal": "ambos"
-    },
-    {
-     "metrica": "cac",
-     "valor": "175.36",
-     "janela": "30d",
-     "canal": "google"
-    },
-    {
-     "metrica": "sessoes>clickoff",
-     "valor": "44.0",
-     "janela": "30d",
-     "canal": "google"
-    }
-   ],
-   "risco_churn": true,
-   "como_validar": "Verificar se a retomada do volume de cliques normaliza a geração de leads e se ajustes na oferta melhoram a taxa sessoes>clickoff.",
-   "hipotese": "Uma alteração em 06/07 cortou a entrega da campanha, e a oferta atual não é atrativa o suficiente para converter o tráfego restante."
-  },
-  {
-   "partner": "Enove",
-   "status_geral": "alarme",
-   "eixo_principal": "funil",
-   "canal_critico": "google",
-   "diagnostico": "Risco de churn ativo: CAC de R$212.88 e leads no piso. Ocorreu uma queda em degrau nos cliques em 2026-07-06. No Google (CAC R$223.33), o gargalo é redirect>leads (13.9%). No Meta, o gargalo é cliques>chat_start (19.9%).",
-   "cadeia_causal": "A queda brusca de tráfego reduziu o volume do topo de funil. O tráfego que chega sofre com fricção no formulário (Google) e baixa atratividade no criativo/CTA (Meta), encarecendo o CAC.",
-   "acao_semana": "Investigar a queda de cliques em 06/07. Simplificar o formulário da landing page (Google) e testar novos criativos/CTAs no Meta.",
-   "confianca": "alta",
-   "evidencias_citadas": [
-    {
-     "metrica": "cac",
-     "valor": "212.88",
-     "janela": "30d",
-     "canal": "ambos"
-    },
-    {
-     "metrica": "cac",
-     "valor": "223.33",
-     "janela": "30d",
-     "canal": "google"
-    },
-    {
-     "metrica": "redirect>leads",
-     "valor": "13.9",
-     "janela": "30d",
-     "canal": "google"
-    },
-    {
-     "metrica": "cliques>chat_start",
-     "valor": "19.9",
-     "janela": "30d",
-     "canal": "meta"
-    }
-   ],
-   "risco_churn": true,
-   "como_validar": "Monitorar se a taxa redirect>leads no Google e cliques>chat_start no Meta aumentam após as implementações.",
-   "hipotese": "Fricção excessiva no formulário e criativos desgastados estão impedindo a conversão do tráfego, que já foi reduzido por uma mudança em 06/07."
-  },
-  {
-   "partner": "Direct",
-   "status_geral": "alarme",
-   "eixo_principal": "funil",
-   "canal_critico": "meta",
-   "diagnostico": "O CAC da conta está em R$208.86, puxado pelo Meta (CAC R$406.2). No Meta, a CTR caiu gradualmente para 0.62% e o gargalo é cliques>chat_start (32.7%), indicando fadiga de criativo. O Google tem CAC de R$150.82 (alerta).",
-   "cadeia_causal": "A queda gradual da CTR no Meta sugere fadiga dos criativos atuais. Isso diminui o volume de entrada e piora a taxa de cliques para início de conversa, elevando drasticamente o custo por aquisição.",
-   "acao_semana": "Rotacionar os criativos no Meta para combater a fadiga e melhorar a atratividade do CTA.",
-   "confianca": "alta",
-   "evidencias_citadas": [
-    {
-     "metrica": "cac",
-     "valor": "208.86",
-     "janela": "30d",
-     "canal": "ambos"
-    },
-    {
-     "metrica": "cac",
-     "valor": "406.2",
-     "janela": "30d",
-     "canal": "meta"
-    },
-    {
-     "metrica": "ctr_pct",
-     "valor": "0.62",
-     "janela": "30d",
-     "canal": "meta"
-    },
-    {
-     "metrica": "cliques>chat_start",
-     "valor": "32.7",
-     "janela": "30d",
-     "canal": "meta"
-    },
-    {
-     "metrica": "cac",
-     "valor": "150.82",
-     "janela": "30d",
-     "canal": "google"
-    }
-   ],
-   "risco_churn": false,
-   "como_validar": "Acompanhar se a CTR e a taxa cliques>chat_start no Meta apresentam recuperação nos próximos 7d após a troca.",
-   "hipotese": "Os criativos do Meta esgotaram seu potencial com o público atual, gerando desinteresse e cliques desqualificados."
+   "movimento_semanal": "CAC semanal sem base (2 vendas nesta semana).",
+   "como_validar": "Acompanhar se as taxas de clickoff>redirect e zip_search>redirect aumentam e se o pct_cashback diminui nos proximos 7d.",
+   "hipotese": "A segmentacao atual esta ampla demais, englobando CEPs onde o provedor nao tem viabilidade tecnica.",
+   "mudou_vs_semana_anterior": "a acao nao parece ter sido executada (indicador e padrao seguem identicos)"
   },
   {
    "partner": "Unifique",
    "status_geral": "dado_suspeito",
    "eixo_principal": "rastreamento",
    "canal_critico": "nenhum",
-   "diagnostico": "A conta apresenta investimento de R$112 em 30d, mas não registrou nenhum lead. Houve uma queda em degrau nos cliques em 2026-07-06, indicando possível quebra de rastreamento ou pausa indevida.",
-   "cadeia_causal": "O consumo de verba sem geração de leads, aliado à queda abrupta de cliques, aponta fortemente para uma falha técnica no rastreamento de conversões ou erro na configuração das campanhas.",
-   "acao_semana": "Verificar imediatamente o funcionamento das tags de rastreamento de conversão e o status das campanhas.",
+   "diagnostico": "A conta apresenta investimento de R$112 em 30d, mas nao registrou nenhum lead. Houve uma queda em degrau nos cliques em 2026-07-06, indicando possivel quebra de rastreamento ou pausa indevida.",
+   "cadeia_causal": "O consumo de verba sem geracao de leads, aliado a queda abrupta de cliques, aponta fortemente para uma falha tecnica no rastreamento de conversoes ou erro na configuracao das campanhas.",
+   "acao_semana": "Verificar imediatamente o funcionamento das tags de rastreamento de conversao e o status das campanhas.",
    "confianca": "alta",
    "evidencias_citadas": [
     {
@@ -192,107 +305,10 @@
     }
    ],
    "risco_churn": false,
-   "como_validar": "Realizar testes de conversão (lead teste) para confirmar se as tags estão disparando corretamente.",
-   "hipotese": "As tags de conversão foram removidas ou quebraram em 06/07, impedindo o registro dos leads gerados."
-  },
-  {
-   "partner": "Interplus",
-   "status_geral": "sem_base",
-   "eixo_principal": "rastreamento",
-   "canal_critico": "nenhum",
-   "diagnostico": "A conta gerou apenas 2 leads em 30d, ficando sem base para análise de performance. Os cliques caíram 100% nas últimas semanas, indicando que as campanhas pararam de rodar.",
-   "cadeia_causal": "A ausência de tráfego e leads recentes sugere que as campanhas foram pausadas, ficaram sem saldo ou sofreram reprovação, interrompendo a entrega.",
-   "acao_semana": "Investigar o motivo da interrupção da entrega das campanhas (saldo, reprovação ou pausa manual).",
-   "confianca": "alta",
-   "evidencias_citadas": [
-    {
-     "metrica": "leads",
-     "valor": "2",
-     "janela": "30d",
-     "canal": "ambos"
-    }
-   ],
-   "risco_churn": false,
-   "como_validar": "Verificar o status das campanhas nas plataformas e confirmar se a entrega foi retomada.",
-   "hipotese": "Problemas de faturamento ou reprovação de anúncios paralisaram a veiculação das campanhas."
-  },
-  {
-   "partner": "Loga",
-   "status_geral": "ok",
-   "eixo_principal": "saudavel",
-   "canal_critico": "nenhum",
-   "diagnostico": "Conta com performance saudável e CAC de R$108.83. O Google entrega CAC de R$98.71. No Meta (CAC R$137.41), o gargalo é zip_search>redirect (46.0%), indicando que parte dos usuários não tem cobertura.",
-   "cadeia_causal": "Apesar da boa performance geral, a taxa de zip_search>redirect no Meta mostra que há espaço para otimização na segmentação geográfica, evitando cliques de regiões sem viabilidade.",
-   "acao_semana": "Manter a estrutura atual, mas revisar o raio de segmentação no Meta para melhorar a taxa de viabilidade.",
-   "confianca": "alta",
-   "evidencias_citadas": [
-    {
-     "metrica": "cac",
-     "valor": "108.83",
-     "janela": "30d",
-     "canal": "ambos"
-    },
-    {
-     "metrica": "cac",
-     "valor": "98.71",
-     "janela": "30d",
-     "canal": "google"
-    },
-    {
-     "metrica": "cac",
-     "valor": "137.41",
-     "janela": "30d",
-     "canal": "meta"
-    },
-    {
-     "metrica": "zip_search>redirect",
-     "valor": "46.0",
-     "janela": "30d",
-     "canal": "meta"
-    }
-   ],
-   "risco_churn": false,
-   "como_validar": "Observar se a taxa zip_search>redirect no Meta aumenta nos próximos 7d após o ajuste de raio.",
-   "hipotese": "A segmentação do Meta está ligeiramente ampla, captando usuários interessados, mas fora da área de cobertura."
-  },
-  {
-   "partner": "Ativa Telecom",
-   "status_geral": "ok",
-   "eixo_principal": "saudavel",
-   "canal_critico": "nenhum",
-   "diagnostico": "Conta saudável com CAC de R$70.83. O Google (CAC R$95.2) possui gargalo em redirect>leads (12.3%), apontando fricção no formulário. O Meta gerou apenas 1 lead e está sem base.",
-   "cadeia_causal": "O tráfego do Google chega à landing page, mas a baixa taxa de conversão final (redirect>leads) indica que o formulário pode estar longo ou apresentando falhas, dificultando a captação.",
-   "acao_semana": "Otimizar a landing page do Google, simplificando o formulário para reduzir a fricção e aumentar a conversão final.",
-   "confianca": "alta",
-   "evidencias_citadas": [
-    {
-     "metrica": "cac",
-     "valor": "70.83",
-     "janela": "30d",
-     "canal": "ambos"
-    },
-    {
-     "metrica": "cac",
-     "valor": "95.2",
-     "janela": "30d",
-     "canal": "google"
-    },
-    {
-     "metrica": "redirect>leads",
-     "valor": "12.3",
-     "janela": "30d",
-     "canal": "google"
-    },
-    {
-     "metrica": "leads",
-     "valor": "1",
-     "janela": "30d",
-     "canal": "meta"
-    }
-   ],
-   "risco_churn": false,
-   "como_validar": "Acompanhar se a taxa redirect>leads no Google apresenta crescimento nos próximos 7d.",
-   "hipotese": "Campos excessivos ou layout confuso no formulário da landing page estão causando abandono na última etapa do funil."
+   "movimento_semanal": "Sem base para leitura de CAC (0 vendas).",
+   "como_validar": "Realizar testes de conversao (lead teste) para confirmar se as tags estao disparando corretamente.",
+   "hipotese": "As tags de conversao foram removidas ou quebraram em 06/07, impedindo o registro dos leads gerados.",
+   "mudou_vs_semana_anterior": "a acao nao parece ter sido executada (indicador e padrao seguem identicos)"
   }
  ],
  "acoes_priorizadas": [
@@ -300,27 +316,27 @@
    "ordem": 1,
    "partner": "Ultranet",
    "canal": "ambos",
-   "acao": "Apertar o raio de segmentação geográfica.",
-   "justificativa": "CAC de R$463 e cashback subindo indicam compra de demanda fora da área de cobertura.",
-   "impacto_esperado": "Redução imediata de desperdício de verba e queda do CAC.",
+   "acao": "Apertar o raio de segmentacao geografica.",
+   "justificativa": "CAC de R$463 e cashback subindo indicam compra de demanda fora da area de cobertura.",
+   "impacto_esperado": "Reducao imediata de desperdicio de verba e queda do CAC.",
    "confianca": "alta"
   },
   {
    "ordem": 2,
-   "partner": "The Fiber",
-   "canal": "google",
-   "acao": "Investigar queda de cliques em 06/07 e revisar oferta.",
-   "justificativa": "Risco de churn com CAC de R$274 e queda brusca de tráfego na conta.",
-   "impacto_esperado": "Retomada de volume de leads e melhora na retenção da landing page.",
-   "confianca": "alta"
-  },
-  {
-   "ordem": 3,
    "partner": "Enove",
    "canal": "ambos",
    "acao": "Investigar queda de cliques e otimizar LP/criativos.",
    "justificativa": "Risco de churn com CAC de R$213 e gargalos fortes no final do funil em ambos os canais.",
-   "impacto_esperado": "Aumento da taxa de conversão final e redução do CAC.",
+   "impacto_esperado": "Aumento da taxa de conversao final e reducao do CAC.",
+   "confianca": "alta"
+  },
+  {
+   "ordem": 3,
+   "partner": "The Fiber",
+   "canal": "google",
+   "acao": "Investigar queda de cliques em 06/07 e revisar oferta.",
+   "justificativa": "Risco de churn com CAC de R$274 e queda brusca de trafego na conta.",
+   "impacto_esperado": "Retomada de volume de leads e melhora na retencao da landing page.",
    "confianca": "alta"
   },
   {
@@ -329,14 +345,14 @@
    "canal": "meta",
    "acao": "Rotacionar criativos.",
    "justificativa": "CAC de R$406 no Meta com sinais claros de fadiga de criativo (queda de CTR).",
-   "impacto_esperado": "Recuperação da CTR e barateamento do tráfego de entrada.",
+   "impacto_esperado": "Recuperacao da CTR e barateamento do trafego de entrada.",
    "confianca": "alta"
   },
   {
    "ordem": 5,
    "partner": "Unifique",
    "canal": "ambos",
-   "acao": "Verificar rastreamento de conversão.",
+   "acao": "Verificar rastreamento de conversao.",
    "justificativa": "Gasto de verba sem registro de leads e queda em degrau nos cliques.",
    "impacto_esperado": "Voltar a medir resultados corretamente e evitar perda de dados.",
    "confianca": "alta"
@@ -345,27 +361,27 @@
    "ordem": 6,
    "partner": "Interplus",
    "canal": "ambos",
-   "acao": "Investigar interrupção das campanhas.",
-   "justificativa": "Tráfego zerado nas últimas semanas, indicando pausa ou reprovação.",
-   "impacto_esperado": "Retomada da entrega e geração de leads.",
+   "acao": "Investigar interrupcao das campanhas.",
+   "justificativa": "Trafego zerado nas ultimas semanas, indicando pausa ou reprovacao.",
+   "impacto_esperado": "Retomada da entrega e geracao de leads.",
    "confianca": "alta"
   },
   {
    "ordem": 7,
    "partner": "Loga",
    "canal": "meta",
-   "acao": "Revisar raio de segmentação.",
+   "acao": "Revisar raio de segmentacao.",
    "justificativa": "Gargalo em viabilidade no Meta, indicando cliques de fora da cobertura.",
-   "impacto_esperado": "Aumento da eficiência do canal e melhora na taxa de conversão.",
+   "impacto_esperado": "Aumento da eficiencia do canal e melhora na taxa de conversao.",
    "confianca": "alta"
   },
   {
    "ordem": 8,
    "partner": "Ativa Telecom",
    "canal": "google",
-   "acao": "Simplificar formulário da LP.",
-   "justificativa": "Gargalo em redirect>leads no Google aponta fricção na conversão final.",
-   "impacto_esperado": "Aumento do volume de leads mantendo o CAC saudável.",
+   "acao": "Simplificar formulario da LP.",
+   "justificativa": "Gargalo em redirect>leads no Google aponta friccao na conversao final.",
+   "impacto_esperado": "Aumento do volume de leads mantendo o CAC saudavel.",
    "confianca": "alta"
   }
  ]
