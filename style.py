@@ -47,8 +47,6 @@ table.dk-table .cell-delta.up   { color: var(--good-text); }
 table.dk-table .cell-delta.down { color: var(--crit-text); }
 table.dk-table .cell-delta.flat { color: var(--mut2); font-weight:500; }
 table.dk-table tr.tr-total td { background:var(--bd-soft); font-weight:700; }
-table.dk-table tr.tr-warn td { background:var(--warn-bg); }
-table.dk-table tr.tr-warn td:first-child { border-left:3px solid var(--warn); }
 table.dk-table th.canal-group.google, table.dk-table th.canal-group.meta { text-align:center; }
 table.dk-table th.canal-group.google { color:var(--google); border-bottom:2px solid var(--google); }
 table.dk-table th.canal-group.meta { color:var(--meta); border-bottom:2px solid var(--meta); }

@@ -400,22 +400,25 @@ Toggle **Mensal** (últimos 5 meses fechados) ou **Semanal** (últimas 12 semana
 - **%Assertividade Meta** = Leads Meta / Chat start Meta
 - Lead → Venda
 
-Os dados são extraídos das mesmas fontes das outras seções (consistente com filtros aplicados).
+Os dados são extraídos das mesmas fontes das outras seções e usam o mesmo filtro de <strong>Partner</strong>
+do topo da página — não tem seletor próprio, pra evitar essa seção mostrar um partner diferente do resto
+do dashboard.
+
+**O filtro de Período (7d/30d/90d/mês/custom) não se aplica aqui** — os meses/semanas mostrados são
+sempre os últimos 5 meses fechados (ou 12 semanas), independente da janela selecionada no topo. Por isso
+o CAC/CPL/etc. aqui podem ser bem diferentes dos KPIs no topo da página, que seguem a janela do filtro
+Período.
 """
 
     section_title("Progressão por Partner", TIP_PROGRESSAO)
-    pg1, pg2 = st.columns([1, 2.4])
-    with pg1:
-        prog_gran = st.segmented_control("Granularidade — progressão", ["Mensal", "Semanal"], default="Mensal",
-                                          label_visibility="collapsed", key="prog_gran")
-    with pg2:
-        prog_partners = _inline_partners("prog")
-    if not prog_partners:
-        st.markdown('<div class="empty-hint">Selecione 1 ou mais <strong>Partners</strong> acima '
-                '(ou no filtro do topo) pra ver a progressão deles ao longo do tempo.</div>',
+    prog_gran = st.segmented_control("Granularidade — progressão", ["Mensal", "Semanal"], default="Mensal",
+                                      label_visibility="collapsed", key="prog_gran")
+    if not selected_partners:
+        st.markdown('<div class="empty-hint">Selecione 1 ou mais <strong>Partners</strong> no filtro do topo '
+                'pra ver a progressão deles ao longo do tempo.</div>',
                     unsafe_allow_html=True)
     else:
-        for id_mp in prog_partners:
+        for id_mp in selected_partners:
             with st.container(key=f"prog_block_{id_mp}"):
                 st.markdown(f"**{id_mp}**")
                 prog_df = data.build_progressao_df(id_mp, "weekly" if prog_gran == "Semanal" else "monthly")
@@ -467,100 +470,6 @@ pra não induzir a erro com base pequena.
                 st.markdown(tables.render_taxas_block(taxas_df, data.STAGES_M, gran_label), unsafe_allow_html=True)
     st.caption("Cor do delta: verde = taxa subiu, vermelho = caiu. "
            "\"—\" quando o denominador é menor que 5.")
-
-    st.divider()
-
-    # ------------------------------------------------------------------
-    # Detalhamento investimento x leads x vendas
-    # ------------------------------------------------------------------
-    TIP_DETALHAMENTO = """
-**Consolidado por partner** (soma Google + Meta quando filtro Canal = Todos).
-
-Mesmos filtros das tabelas de funil acima:
-- Lead: `source IN ('google','whatsapp')`, `lead_accepted = true`
-- Venda: `current_situation IN ('sold','installed','scheduled')`
-- Investimento: `raw_investment`, `cashback` e `partnership_net_daily_spend` de `performance_partner_mp_agency`
-
-**Atribuição do lead:** em 7d/30d/90d/mês, por campanha/chat (igual Funil completo); em período
-customizado, direto por `partner_id_partner`. Os dois podem divergir levemente pro mesmo partner/período.
-
-CPL e CAC sobre líquido.
-
----
-**Alerta visual** em Lead→Venda, CAC e CPL: fundo vermelho se <50% (ou >200% pro CAC) da mediana;
-verde no oposto. Só partners com Leads ≥ 3 entram na comparação.
-
----
-**Linha inteira em destaque:** partner com bruto > 0 mas leads = 0 — dinheiro investido sem gerar nenhum lead.
-"""
-
-    section_title("Detalhamento investimento × leads × vendas", TIP_DETALHAMENTO)
-    detail_df_full = data.build_detail_df(d_ini, d_fim, canal_filter)
-    detail_meds = data.detail_medians(detail_df_full)
-    detail_df = detail_df_full[detail_df_full["id_mp"].isin(selected_partners)] if selected_partners else detail_df_full
-    detail_df = detail_df.sort_values("liquido", ascending=False, na_position="last")
-    prev_detail_df = data.build_detail_df(prev_d_ini, prev_d_fim, canal_filter) if compare else None
-    if detail_df["bruto"].sum() == 0:
-        st.markdown('<div class="empty-hint">Sem investimento no período/partners selecionados.</div>',
-                    unsafe_allow_html=True)
-    else:
-        components.html(
-            tables.sortable_doc(tables.render_detail_table(detail_df, detail_meds, prev_detail_df, compare), style.CSS),
-            height=tables.sortable_table_height(len(detail_df), tables.ROW_H_PLAIN, compare), scrolling=True)
-        st.markdown(
-            '<div class="legend-row"><span class="sw"><i class="bad"></i></span> '
-        'pior que a mediana · <span class="sw"><i class="good"></i></span> melhor que a mediana · '
-        '<span class="sw"><i style="background:var(--warn)"></i></span> bruto &gt; 0 e leads = 0.</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.divider()
-
-    # ------------------------------------------------------------------
-    # Crédito Remanescente por Parceiro
-    # ------------------------------------------------------------------
-    TIP_CREDITO = """
-**Fonte:** `credit_remaining` em `performance_partner_mp_agency`, agregado por semana × partnership_id.
-Cada ponto no gráfico é a média do saldo diário na semana, não o valor no último dia dela.
-
-Mostra a evolução do crédito disponível pra mídia de cada parceiro ao longo do tempo. Cada salto pra cima
-indica recarga (aumento do `total_credit`); a queda gradual reflete o consumo pelo investimento diário.
-
-**Valor negativo**: o partner gastou mais do que tinha de crédito ativo no período — pode ser política de
-adiantamento ou ajuste retroativo do MP.
-
-Filtros de canal/período não se aplicam aqui (a métrica é por parceiro, agregada) — o filtro de Partner
-continua valendo.
-"""
-
-    section_title("Crédito Remanescente por Parceiro", TIP_CREDITO)
-    credit_partners = selected_partners if selected_partners else list(data.CREDIT_TIMESERIES.keys())
-    all_days = sorted({r["semana"] for p in credit_partners for r in data.CREDIT_TIMESERIES.get(p, [])})
-    if not all_days:
-        st.markdown('<div class="empty-hint">Sem dados de crédito remanescente pro filtro atual.</div>',
-                    unsafe_allow_html=True)
-    else:
-        fig_credit = go.Figure()
-        for p in credit_partners:
-            by_day = {r["semana"]: r["credito"] for r in data.CREDIT_TIMESERIES.get(p, [])}
-            y = [by_day.get(d) for d in all_days]
-            fig_credit.add_trace(go.Scatter(
-                x=all_days, y=y, mode="lines", name=p, connectgaps=True,
-                line=dict(color=data.PARTNER_COLORS.get(p, "#64748b"), width=2),
-                hovertemplate="%{fullData.name} · %{x|%d/%m/%y}: R$ %{y:,.0f}<extra></extra>",
-            ))
-        fig_credit.update_layout(
-            height=320, margin=dict(l=10, r=10, t=10, b=10),
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="sans serif", color="#171a1a", size=12),
-            hoverlabel=dict(bgcolor="#ffffff", bordercolor="#dde2df", font_size=12, font_family="sans serif"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            xaxis=dict(showgrid=False, type="date", tickformat="%d/%m/%y", tickfont=dict(size=11, color="#666e6b")),
-            yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)", title="Crédito remanescente (R$)",
-                       tickfont=dict(size=11, color="#666e6b")),
-        )
-        st.plotly_chart(fig_credit, use_container_width=True)
-    st.caption("Clique num item da legenda pra ocultar/exibir a linha do parceiro.")
 
     st.divider()
 

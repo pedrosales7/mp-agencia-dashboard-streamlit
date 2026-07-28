@@ -224,39 +224,6 @@ def compute_totals(d_ini, d_fim, canal_filter, partners=None):
     }
 
 
-# ------------------------------------------------------------------
-# Detalhamento investimento x leads x vendas -- consolidado por partner
-# (soma Google + Meta quando canal_filter=None, igual ao renderDetailTable()
-# do HTML).
-# ------------------------------------------------------------------
-def build_detail_df(d_ini, d_fim, canal_filter):
-    parts = []
-    if not canal_filter or canal_filter == "google":
-        parts.append(_daily_snapshot[(_daily_snapshot["canal"] == "google") & _window_mask(_daily_snapshot, d_ini, d_fim)])
-    if not canal_filter or canal_filter == "meta":
-        parts.append(_daily_snapshot[(_daily_snapshot["canal"] == "meta") & _window_mask(_daily_snapshot, d_ini, d_fim)])
-    combined = pd.concat(parts) if parts else _daily_snapshot.iloc[0:0]
-    agg = combined.groupby("id_mp")[["bruto", "cashback", "leads", "vendas"]].sum() if len(combined) \
-        else pd.DataFrame(columns=["bruto", "cashback", "leads", "vendas"])
-    agg = agg.reindex(PARTNERS, fill_value=0).reset_index().rename(columns={"index": "id_mp"})
-    agg["liquido"] = agg["bruto"] - agg["cashback"]
-    agg["cpl"] = agg.apply(lambda r: safe_div(r["liquido"], r["leads"]), axis=1)
-    agg["cac"] = agg.apply(lambda r: safe_div(r["liquido"], r["vendas"]), axis=1)
-    agg["rate"] = agg.apply(lambda r: safe_div(r["vendas"], r["leads"]), axis=1)
-    return agg.sort_values("bruto", ascending=False)
-
-
-def detail_medians(df):
-    """Medianas pra outlier -- só partners com Leads >= 3 entram (mesma regra
-    do HTML)."""
-    peers = df[df["leads"] >= 3]
-    med_rate = median(peers["rate"].tolist())
-    cac_ok = peers[(peers["vendas"] > 0) & (peers["liquido"] > 0)]
-    med_cac = median(cac_ok["cac"].tolist()) if len(cac_ok) else None
-    cpl_ok = peers[peers["liquido"] > 0]
-    med_cpl = median(cpl_ok["cpl"].tolist()) if len(cpl_ok) else None
-    return med_rate, med_cac, med_cpl
-
 
 # ------------------------------------------------------------------
 # Cobertura e Assertividade -- 1 linha por partner, Google/Meta lado a lado

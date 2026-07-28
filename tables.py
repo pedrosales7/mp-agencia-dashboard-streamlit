@@ -121,60 +121,6 @@ def render_funnel_table(df, step_keys, step_labels, min_cliques, prev_df=None, c
     return "".join(html)
 
 
-def render_detail_table(df, meds, prev_df=None, compare=False):
-    """Consolidado por partner (soma Google + Meta quando canal=Todos).
-    Linha inteira em destaque quando bruto>0 e leads=0 (partner queimando
-    investimento sem gerar lead) -- mesmo alerta do HTML."""
-    med_rate, med_cac, med_cpl = meds
-    head = ["Partner", "Bruto", "Cashback", "Líquido", "Leads", "Vendas", "CPL líq.", "CAC líq.", "Lead→Venda"]
-    # data-sort carrega o valor CRU: a célula mostra "R$ 2.780" e "84,8%", que
-    # não ordenam como número. O JS do iframe lê o data-sort, não o texto.
-    html = (['<table class="dk-table sortable"><thead><tr>']
-            + [f'<th data-type="{"text" if i == 0 else "num"}">{h}</th>' for i, h in enumerate(head)]
-            + ["</tr></thead><tbody>"])
-
-    prev_by_id = {r["id_mp"]: r for _, r in prev_df.iterrows()} if compare and prev_df is not None else {}
-
-    totals = {"bruto": 0, "cashback": 0, "leads": 0, "vendas": 0}
-    for _, r in df.iterrows():
-        pr = prev_by_id.get(r["id_mp"])
-        warn = r["bruto"] > 0 and r["leads"] == 0
-        eligible = r["leads"] >= 3
-        cls_rate = outlier_status(r["rate"], med_rate, "rate") if eligible else None
-        cls_cac = outlier_status(r["cac"], med_cac, "cost") if eligible and r["vendas"] > 0 else None
-        cls_cpl = outlier_status(r["cpl"], med_cpl, "cost") if eligible else None
-        cells = [
-            f'<td class="partner-cell" data-sort="{r["id_mp"]}">{r["id_mp"]}</td>',
-            f'<td {_ds(r["bruto"])}>{fmt_brl(r["bruto"])}</td>',
-            f'<td {_ds(r["cashback"])}>{fmt_brl(r["cashback"])}</td>',
-            f'<td {_ds(r["liquido"])}>{fmt_brl(r["liquido"])}</td>',
-            f'<td {_ds(r["leads"])}>{fmt_num(r["leads"])}{_delta_pct(r["leads"], pr["leads"] if pr is not None else None, "up_good")}</td>',
-            f'<td {_ds(r["vendas"])}>{fmt_num(r["vendas"])}{_delta_pct(r["vendas"], pr["vendas"] if pr is not None else None, "up_good")}</td>',
-            f'<td class="{cls_cpl or ""}" {_ds(r["cpl"])}>{fmt_brl(r["cpl"])}'
-            f'{_delta_pct(r["cpl"], pr["cpl"] if pr is not None else None, "down_good")}</td>',
-            f'<td class="{cls_cac or ""}" {_ds(r["cac"])}>{fmt_brl(r["cac"])}'
-            f'{_delta_pct(r["cac"], pr["cac"] if pr is not None else None, "down_good")}</td>',
-            f'<td class="{cls_rate or ""}" {_ds(r["rate"])}>{fmt_pct(r["rate"])}'
-            f'{_delta_pct(r["rate"], pr["rate"] if pr is not None else None, "up_good")}</td>',
-        ]
-        html.append(f'<tr class="{"tr-warn" if warn else ""}">' + "".join(cells) + "</tr>")
-        totals["bruto"] += r["bruto"]; totals["cashback"] += r["cashback"]
-        totals["leads"] += r["leads"]; totals["vendas"] += r["vendas"]
-
-    tot_liquido = totals["bruto"] - totals["cashback"]
-    tot_cells = [
-        '<td class="partner-cell">TOTAL</td>', f'<td>{fmt_brl(totals["bruto"])}</td>',
-        f'<td>{fmt_brl(totals["cashback"])}</td>', f'<td>{fmt_brl(tot_liquido)}</td>',
-        f'<td>{fmt_num(totals["leads"])}</td>', f'<td>{fmt_num(totals["vendas"])}</td>',
-        f'<td>{fmt_brl(safe_div(tot_liquido, totals["leads"]))}</td>',
-        f'<td>{fmt_brl(safe_div(tot_liquido, totals["vendas"]))}</td>',
-        f'<td>{fmt_pct(safe_div(totals["vendas"], totals["leads"]))}</td>',
-    ]
-    html.append('<tr class="tr-total" data-pin="1">' + "".join(tot_cells) + "</tr>")
-    html.append("</tbody></table>")
-    return "".join(html)
-
-
 def render_coverage_table(df):
     """1 linha por partner, Google e Meta como grupos de coluna lado a lado
     (cabeçalho de 2 níveis) -- cada canal tem sua própria base (Clickoff pro
@@ -344,7 +290,6 @@ SORT_CSS = """
 # segunda linha dentro da célula, o detalhamento não. Com "Comparar" ligado
 # entra mais um span de delta, que empurra um pouco.
 ROW_H_FUNNEL = 42
-ROW_H_PLAIN = 30
 ROW_H_COMPARE_EXTRA = 10
 
 
