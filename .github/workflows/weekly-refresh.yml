@@ -1,8 +1,11 @@
 name: Weekly Dashboard Refresh (Streamlit)
 
 on:
-  schedule:
-    - cron: '52 11 * * 2'  # toda terça, 8:52 BRT (UTC-3) — 15min depois do refresh do dashboard HTML, pra não bater os dois no Metabase ao mesmo tempo
+  # schedule desligado em 2026-07-28 -- dashboard Streamlit não devia ter ido
+  # pra prod ainda (revisão em andamento). Reativar removendo o comentário
+  # abaixo quando resolver.
+  # schedule:
+  #   - cron: '52 11 * * 2'  # toda terça, 8:52 BRT (UTC-3) — 15min depois do refresh do dashboard HTML, pra não bater os dois no Metabase ao mesmo tempo
   workflow_dispatch:
     inputs:
       test_mode:
